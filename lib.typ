@@ -3,6 +3,8 @@
 #let _rss-weekdays = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 #let _rss-months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
+#let _space-func = [ ].func()
+
 #let _to-text(v) = {
   if v == none {
     ""
@@ -11,16 +13,41 @@
   } else if type(v) == int or type(v) == float {
     str(v)
   } else if type(v) == content {
-    if v.has("text") {
-      v.text
+    if v == [ ] or v.func() == _space-func {
+      " "
+    } else if v.func() == parbreak or v.func() == linebreak {
+      "\n"
+    } else if v.func() == smartquote {
+      if v.at("double", default: true) { "\"" } else { "'" }
+    } else if v.func() == metadata {
+      ""
+    } else if v.has("text") {
+      if type(v.text) == str { v.text } else { _to-text(v.text) }
     } else if v.has("children") {
-      v.children.map(_to-text).join()
+      if v.children.len() == 0 { "" } else { v.children.map(_to-text).join("") }
     } else if v.has("body") {
       _to-text(v.body)
     } else if v.has("child") {
       _to-text(v.child)
-    } else if v == [ ] {
-      " "
+    } else if v.has("base") {
+      let s = _to-text(v.base)
+      for k in ("tl", "bl") {
+        if v.has(k) and v.at(k) != none { s = _to-text(v.at(k)) + s }
+      }
+      if v.has("accent") and v.accent != none { s += _to-text(v.accent) }
+      if v.has("b") and v.b != none { s += "_" + _to-text(v.b) }
+      if v.has("t") and v.t != none { s += "^" + _to-text(v.t) }
+      for k in ("br", "tr") {
+        if v.has(k) and v.at(k) != none { s += _to-text(v.at(k)) }
+      }
+      s
+    } else if v.has("num") and v.has("denom") {
+      _to-text(v.num) + "/" + _to-text(v.denom)
+    } else if v.has("radicand") {
+      let idx = if v.has("index") and v.index != none { _to-text(v.index) } else { "" }
+      idx + "√(" + _to-text(v.radicand) + ")"
+    } else if v.func() == math.primes and v.has("count") {
+      "'" * v.count
     } else {
       ""
     }
@@ -54,10 +81,22 @@
   }
 }
 
-#let _format-rfc3339(dt, field-name: "datetime") = {
+#let _normalize-rfc3339-tz(tz) = {
+  let s = str(tz).trim()
+  if s == "" or s == "Z" or s == "z" or s == "+0000" or s == "-0000" {
+    "Z"
+  } else if s.len() == 5 and (s.starts-with("+") or s.starts-with("-")) and not s.contains(":") {
+    s.slice(0, 3) + ":" + s.slice(3, 5)
+  } else {
+    s
+  }
+}
+
+/// Format a `datetime` as an RFC 3339 timestamp for Atom 1.0 (`<updated>`, `<published>`) and XML sitemaps.
+#let format-rfc3339(dt, tz: "Z", field-name: "datetime") = {
   _normalize-datetime(dt, field-name: field-name).display(
-    "[year]-[month]-[day]T[hour]:[minute]:[second]Z",
-  )
+    "[year]-[month]-[day]T[hour]:[minute]:[second]",
+  ) + _normalize-rfc3339-tz(tz)
 }
 
 #let _weekday-index(year, month, day) = {
@@ -155,6 +194,7 @@
   id: none,
   updated: auto,
   published: none,
+  tz: "Z",
   summary: none,
   content: none,
   content-type: "html",
@@ -181,9 +221,9 @@
         attrs: (rel: "alternate", type: "text/html", href: _to-text(link)),
       ),
       (tag: "id", children: (_to-text(id),)),
-      (tag: "updated", children: (_format-rfc3339(eff-updated, field-name: "updated"),)),
+      (tag: "updated", children: (format-rfc3339(eff-updated, tz: tz, field-name: "updated"),)),
       ..if published != none {
-        ((tag: "published", children: (_format-rfc3339(published, field-name: "published"),)),)
+        ((tag: "published", children: (format-rfc3339(published, tz: tz, field-name: "published"),)),)
       } else { () },
       ..if summary != none { ((tag: "summary", children: (_to-text(summary),)),) } else { () },
       ..if content != none {
@@ -203,6 +243,7 @@
   feed-link: auto,
   id: none,
   updated: auto,
+  tz: "Z",
   authors: (),
   posts: (),
 ) = {
@@ -223,7 +264,7 @@
     }
     post-times.sorted().last()
   } else {
-    _format-rfc3339(updated, field-name: "updated")
+    format-rfc3339(updated, tz: tz, field-name: "updated")
   }
 
   let resolved-feed-link = if feed-link == auto {
@@ -282,6 +323,7 @@
   id: auto,
   is-permalink: auto,
   published: none,
+  tz: "+0000",
   summary: none,
   content: none,
   author: none,
@@ -297,12 +339,12 @@
   let eff-permalink = if is-permalink == auto {
     eff-id != none and (eff-id.starts-with("http://") or eff-id.starts-with("https://"))
   } else {
-    bool(is-permalink)
+    is-permalink == true
   }
   let pub-str = if published == none {
     none
   } else if type(published) == datetime {
-    format-rfc2822(published)
+    format-rfc2822(published, tz: tz)
   } else {
     _to-text(published)
   }
@@ -334,13 +376,30 @@
 
 #let rss-item = rss-post
 
+#let _rfc2822-sort-key(pub-str) = {
+  let parts = str(pub-str).trim().split(" ").filter(s => s != "")
+  if parts.len() < 5 {
+    return none
+  }
+  let m-idx = _rss-months.position(m => m == parts.at(2))
+  if m-idx == none {
+    return none
+  }
+  let day-raw = parts.at(1)
+  let day = if day-raw.len() == 1 { "0" + day-raw } else { day-raw }
+  let mon-num = m-idx + 1
+  let mon = if mon-num < 10 { "0" + str(mon-num) } else { str(mon-num) }
+  parts.at(3) + "-" + mon + "-" + day + "T" + parts.at(4)
+}
+
 /// Encode an RSS 2.0 `<rss>` document to XML using the same conventions as `atom-encode`.
 #let rss-encode(
   title: none,
   subtitle: none,
   site-link: none,
   feed-link: auto,
-  updated: none,
+  updated: auto,
+  tz: "+0000",
   language: none,
   copyright: none,
   generator: none,
@@ -365,8 +424,18 @@
   }
   let updated-str = if updated == none {
     none
+  } else if updated == auto {
+    let pub-pairs = posts
+      .map(p => _find-child-text(p, "pubDate"))
+      .filter(d => d != none and _rfc2822-sort-key(d) != none)
+      .map(d => (key: _rfc2822-sort-key(d), raw: d))
+    if pub-pairs.len() > 0 {
+      pub-pairs.sorted(key: pair => pair.key).last().raw
+    } else {
+      none
+    }
   } else if type(updated) == datetime {
-    format-rfc2822(updated)
+    format-rfc2822(updated, tz: tz)
   } else {
     _to-text(updated)
   }
@@ -410,5 +479,75 @@
     ),
   )
 
+  to-xml(c, pretty: true)
+}
+
+#let _format-w3c-datetime(dt, tz: "Z", field-name: "lastmod") = {
+  if type(dt) != datetime {
+    panic("`" + field-name + "` must be a `datetime`!")
+  }
+  if dt.year() == none or dt.month() == none or dt.day() == none {
+    panic("`" + field-name + "` must include `year`, `month`, and `day`!")
+  }
+  if dt.hour() == none {
+    dt.display("[year]-[month]-[day]")
+  } else {
+    format-rfc3339(dt, tz: tz, field-name: field-name)
+  }
+}
+
+/// Build a `<url>` entry for `sitemap-encode` (`http://www.sitemaps.org/schemas/sitemap/0.9`).
+#let sitemap-url(
+  loc,
+  lastmod: none,
+  tz: "Z",
+  changefreq: none,
+  priority: none,
+  alternates: (),
+) = {
+  if loc == none {
+    panic("`loc` cannot be `none`!")
+  }
+  let lastmod-str = if lastmod == none {
+    none
+  } else if type(lastmod) == datetime {
+    _format-w3c-datetime(lastmod, tz: tz, field-name: "lastmod")
+  } else {
+    _to-text(lastmod)
+  }
+
+  (
+    tag: "url",
+    children: (
+      (tag: "loc", children: (_to-text(loc),)),
+      ..if lastmod-str != none { ((tag: "lastmod", children: (lastmod-str,)),) } else { () },
+      ..if changefreq != none { ((tag: "changefreq", children: (_to-text(changefreq),)),) } else { () },
+      ..if priority != none { ((tag: "priority", children: (_to-text(priority),)),) } else { () },
+      ..alternates.map(alt => (
+        tag: "link",
+        namespace: "xhtml",
+        attrs: (
+          rel: "alternate",
+          hreflang: _to-text(alt.hreflang),
+          href: _to-text(alt.href),
+        ),
+      )),
+    ),
+  )
+}
+
+/// Encode an XML sitemap (`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`).
+#let sitemap-encode(
+  urls: (),
+) = {
+  let has-xhtml-ns = urls.any(u => _has-namespaced-child(u, "xhtml"))
+  let c = (
+    tag: "urlset",
+    attrs: (
+      xmlns: "http://www.sitemaps.org/schemas/sitemap/0.9",
+      ..if has-xhtml-ns { ("xmlns:xhtml": "http://www.w3.org/1999/xhtml") } else { (:) },
+    ),
+    children: urls,
+  )
   to-xml(c, pretty: true)
 }

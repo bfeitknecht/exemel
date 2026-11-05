@@ -1,10 +1,10 @@
 # Exemel
-Encodes Typst values to XML. This package also provides built-in support for generating Atom 1.0 and RSS 2.0 feeds.
+Encodes Typst values to XML. This package also provides built-in support for generating Atom 1.0 feeds, RSS 2.0 feeds, and XML sitemaps.
 
 ## Encoding XML
 You should structure your Typst values as follows:
 ```typ
-#import "@preview/exemel:0.1.0": to-xml
+#import "@preview/exemel:0.3.0": to-xml
 
 // An XML node is either:
 // - a dictionary describing an element, or
@@ -43,7 +43,7 @@ Notes on the shape:
 
 ## Generating Atom Feed
 ```typ
-#import "@preview/exemel:0.1.0": atom-encode, atom-post, atom-author, atom-site-id
+#import "@preview/exemel:0.3.0": atom-encode, atom-post, atom-author, atom-site-id
 
 #let me = atom-author(
   "Hachimi",
@@ -87,7 +87,7 @@ Notes on the shape:
 - `site-link` (required): the human-readable site URL
 - `feed-link`: the URL of the feed itself; defaults to `site-link + "/feed.xml"`
 - `id` (required): a stable, unique feed identifier; `atom-site-id` is a helper for building spec-compliant `tag:` URIs (RFC 4151) from a domain you control
-- `updated` (`datetime` or `auto`): when the feed was last modified; defaults to `auto` (inferred from the latest entry in `posts`), and date-only `datetime(year: ..., month: ..., day: ...)` values default their time component to `00:00:00Z`
+- `updated` (`datetime` or `auto`): when the feed was last modified; defaults to `auto` (inferred from the latest entry in `posts`), and date-only `datetime(year: ..., month: ..., day: ...)` values default their time component to `00:00:00` formatted with `tz` (default `"Z"`, via `format-rfc3339`)
 - `authors`: an array built from `atom-author(...)` calls
 - `posts`: an array built from `atom-post(...)` calls
 
@@ -106,7 +106,7 @@ Notes on the shape:
 `rss-encode` and `rss-post` mirror the `atom-encode` / `atom-post` conventions so sites can emit both Atom 1.0 and RSS 2.0 from the same post metadata:
 
 ```typ
-#import "@preview/exemel:0.1.0": rss-encode, rss-post, rss-enclosure
+#import "@preview/exemel:0.3.0": rss-encode, rss-post, rss-enclosure
 
 #let items = (
   rss-post(
@@ -131,7 +131,7 @@ Notes on the shape:
 - `title` (required), `subtitle` (optional `<description>`, defaults to `title`)
 - `site-link` (required `<link>`)
 - `feed-link`: URL for `<atom:link rel="self" type="application/rss+xml" .../>`; defaults to `site-link + "/rss.xml"` (pass `none` to omit)
-- `updated`: optional `datetime` formatted as RFC 2822 `<lastBuildDate>` via `format-rfc2822`
+- `updated`: `auto` (infers `<lastBuildDate>` from the latest item `<pubDate>`, omitting it if none), `datetime` formatted as RFC 2822 via `format-rfc2822` (with optional `tz`, default `"+0000"`), or `none` to omit `<lastBuildDate>`
 - `language`, `copyright`, `generator`, `ttl`: optional channel metadata
 - `posts`: an array built from `rss-post(...)` (alias `rss-item`) calls
 
@@ -142,3 +142,19 @@ Notes on the shape:
 - `published`: optional `datetime` formatted as RFC 2822 `<pubDate>`
 - `summary` (`<description>`), `content` (`<content:encoded>`, automatically declaring `xmlns:content`)
 - `author`, `categories`, `comments`, and `enclosure` (built with `rss-enclosure(url, length: ..., type: ...)`)
+
+## Generating XML Sitemaps
+`sitemap-encode` and `sitemap-url` build spec-compliant `sitemap.xml` documents (`http://www.sitemaps.org/schemas/sitemap/0.9`):
+
+```typ
+#import "@preview/exemel:0.3.0": sitemap-encode, sitemap-url
+
+#sitemap-encode(
+  urls: (
+    sitemap-url("https://example.com/", lastmod: datetime(year: 2026, month: 7, day: 3)),
+    sitemap-url("https://example.com/blog/hayaku-naro/", lastmod: datetime(year: 2026, month: 7, day: 1)),
+  ),
+)
+```
+
+`sitemap-url` builds a `<url>` entry from a canonical URL (`loc`) plus optional `lastmod` (`datetime` or `str`), `changefreq`, `priority`, and `alternates` (`((hreflang: "de", href: "..."),)` — automatically declaring `xmlns:xhtml` on `<urlset>`).

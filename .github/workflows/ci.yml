@@ -23,10 +23,6 @@ jobs:
           tool: just
       - name: Run tests
         run: just test
-      - name: Compile the README examples
-        run: just readme
-      - name: Check that the reference files are up to date
-        run: just check-refs
       - name: Check the documented typst eval workflow
         run: typst eval --root . --in tests/atom.typ 'query(<out>).first().value' | jq -j . | cmp - tests/ref/atom.xml
       - name: Build the manual
@@ -48,6 +44,6 @@ jobs:
           chmod +x "$HOME/.local/bin/typstyle"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Check formatting
-        run: just fmt-check
+        run: just fmt --check
       - name: Check spelling
         run: just spell

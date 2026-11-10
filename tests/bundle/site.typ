@@ -1,5 +1,5 @@
 // Writes the reference documents in tests/ref with bundle export; see
-// `just update-refs`.
+// `just test --update`.
 
 #import "../atom.typ" as atom-test
 #import "../rss.typ" as rss-test

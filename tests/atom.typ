@@ -13,7 +13,7 @@
   contributors: ("Basil",),
   categories: ("blog", (term: "typst", label: "Typst", scheme: "https://typst.app")),
   rights: "© 2026 Hachimi",
-  generator: (name: "syndicate", uri: "https://github.com/bfeitknecht/exemel", version: "0.1.0"),
+  generator: (name: "syndicate", uri: "https://github.com/bfeitknecht/syndicate", version: "0.1.0"),
   icon: site + "favicon.ico",
   language: "en",
   stylesheet: "/feed.xsl",

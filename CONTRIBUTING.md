@@ -10,12 +10,10 @@ You need [Typst](https://typst.app) 0.15, [just](https://just.systems),
 | --- | --- |
 | `just` | List the recipes. |
 | `just check` | Run everything CI checks. |
-| `just test` | Run the tests. |
-| `just readme` | Compile the README's examples against the local code. |
-| `just update-refs` | Regenerate `tests/ref/*.xml` with bundle export. Review the diff afterwards. |
-| `just check-refs` | Fail if `tests/ref/*.xml` is out of date. |
+| `just test` | Run the tests and compile the README examples. |
+| `just test --update` | Regenerate `tests/ref/*.xml` first, then run the tests. Review the diff afterwards. |
 | `just fmt` | Format all Typst files. |
-| `just fmt-check` | Fail if any Typst file is not formatted. |
+| `just fmt --check` | Fail if any Typst file is not formatted. |
 | `just spell` | Check spelling. |
 | `just manual` | Build `docs/manual.pdf`. |
 | `just package` | Run `check`, then assemble `dist/syndicate/<version>` for typst/packages. |
@@ -30,10 +28,11 @@ Set `TYPST` to use a different compiler binary, e.g. `TYPST=~/typst-0.15.0 just 
 - `tests/*.typ` must compile. They check outputs with `assert`, and compare the feeds and
   sitemap against the reference files in `tests/ref`.
 - `tests/fail/*.typ` must fail with the message in their first `// error:` line.
-- Every `typ` code block in the README that imports `@preview/syndicate` is compiled by
-  `just readme`, so it must be a complete example.
-
-After an intentional change to the output, run `just update-refs` and review the diff.
+- `tests/ref/*.xml` must match the documents that `tests/bundle/site.typ` writes with bundle
+  export. After an intentional change to the output, run `just test --update` and review the
+  diff.
+- Every `typ` code block in the README that imports `@preview/syndicate` must compile, so it has
+  to be a complete example.
 
 ## Documentation
 

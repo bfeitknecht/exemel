@@ -13,81 +13,79 @@ default:
     @just --list --unsorted
 
 # Run everything CI checks
-check: fmt-check spell test readme check-refs manual
+check: (fmt "--check") spell test manual
 
-# Run the tests: tests/*.typ must compile, tests/fail/*.typ must fail with their `// error:` message
-test:
+# Run the tests and compile the README examples; `--update` regenerates tests/ref first
+test *flags:
     #!/usr/bin/env bash
     set -uo pipefail
+    update={{ if flags == "--update" { "1" } else if flags == "" { "" } else { error("unknown flag `" + flags + "`, expected `--update`") } }}
     out=$(mktemp -d)
-    trap 'rm -rf "$out"' EXIT
+    trap 'rm -rf "$out" _readme-example.typ' EXIT
     failed=0
+    pass() { echo "ok    $1"; }
+    fail() { echo "FAIL  $1"; [ -s "$out/err" ] && sed 's/^/      /' "$out/err"; failed=1; }
+    compiles() { {{ typst }} compile --root . "$@" 2>"$out/err"; }
+
+    # Reference documents, written to disk with bundle export. These come
+    # first, so that the tests below compare against updated files.
+    if compiles --features bundle --format bundle --input update=1 tests/bundle/site.typ "$out/site"; then
+      for name in {{ refs }}; do
+        ref=tests/ref/$name.xml
+        if [ -n "$update" ]; then
+          cp "$out/site/$name.xml" "$ref" && echo "wrote $ref"
+        elif diff -u "$ref" "$out/site/$name.xml" >"$out/err"; then
+          pass "$ref"
+        else
+          fail "$ref is out of date; run \`just test --update\` and review the diff"
+        fi
+      done
+    else
+      fail tests/bundle/site.typ
+    fi
+
+    # Tests that must compile; they check their output with `assert`.
     for f in tests/*.typ; do
-      if {{ typst }} compile --root . "$f" "$out/out.pdf" 2>"$out/err"; then
-        echo "ok    $f"
-      else
-        echo "FAIL  $f"; sed 's/^/      /' "$out/err"; failed=1
-      fi
+      if compiles "$f" "$out/out.pdf"; then pass "$f"; else fail "$f"; fi
     done
+
+    # Tests that must fail with the message in their `// error:` line.
     for f in tests/fail/*.typ; do
       expected=$(sed -n 's|^// error: ||p' "$f" | head -n 1)
       if [ -z "$expected" ]; then
-        echo "FAIL  $f (missing \`// error:\` line)"; failed=1
-      elif {{ typst }} compile --root . "$f" "$out/out.pdf" 2>"$out/err"; then
-        echo "FAIL  $f (compiled, but expected an error)"; failed=1
+        : >"$out/err"; fail "$f (missing \`// error:\` line)"
+      elif compiles "$f" "$out/out.pdf"; then
+        fail "$f (compiled, but expected an error)"
       elif grep -qF -- "$expected" "$out/err"; then
-        echo "ok    $f"
+        pass "$f"
       else
-        echo "FAIL  $f (expected an error containing: $expected)"; sed 's/^/      /' "$out/err"; failed=1
+        fail "$f (expected an error containing: $expected)"
       fi
     done
-    exit $failed
 
-# Compile the README's examples against the local code
-readme:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    out=$(mktemp -d)
-    trap 'rm -rf "$out"' EXIT
-    # Every ```typ block that imports the package is a complete example.
+    # README examples: every ```typ block that imports the package must compile.
     awk -v out="$out" '
       /^```typ$/ { n++; file = sprintf("%s/example-%02d.typ", out, n); buf = ""; inside = 1; next }
       /^```$/ && inside { if (buf ~ /@preview\/syndicate:/) printf "%s", buf > file; inside = 0; next }
       inside { buf = buf $0 "\n" }
     ' README.md
     for f in "$out"/example-*.typ; do
-      sed 's|@preview/syndicate:{{ version }}|/lib.typ|' "$f" > _readme-example.typ
+      name="README.md $(basename "$f" .typ)"
+      sed 's|@preview/syndicate:{{ version }}|/lib.typ|' "$f" >_readme-example.typ
       if grep -q '@preview/syndicate' _readme-example.typ; then
-        rm -f _readme-example.typ; echo "FAIL  README $(basename "$f" .typ) imports a version other than {{ version }}"; exit 1
-      fi
-      if {{ typst }} compile --root . _readme-example.typ "$out/out.pdf"; then
-        echo "ok    README $(basename "$f" .typ)"
+        : >"$out/err"; fail "$name (imports a version other than {{ version }})"
+      elif compiles _readme-example.typ "$out/out.pdf"; then
+        pass "$name"
       else
-        rm -f _readme-example.typ; echo "FAIL  README $(basename "$f" .typ)"; exit 1
+        fail "$name"
       fi
     done
-    rm -f _readme-example.typ
 
-# Regenerate tests/ref/*.xml with bundle export (review the diff afterwards)
-update-refs:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    out=$(mktemp -d)
-    trap 'rm -rf "$out"' EXIT
-    {{ typst }} compile --root . --features bundle --format bundle --input update=1 tests/bundle/site.typ "$out/site"
-    for name in {{ refs }}; do cp "$out/site/$name.xml" tests/ref/; done
+    exit $failed
 
-# Fail if tests/ref/*.xml is out of date
-check-refs: update-refs
-    git diff --exit-code tests/ref
-
-# Format all Typst files with typstyle
-fmt:
-    {{ typstyle }} -l 100 -i {{ sources }}
-
-# Fail if any Typst file is not formatted
-fmt-check:
-    {{ typstyle }} -l 100 --check {{ sources }}
+# Format all Typst files with typstyle; `--check` only reports unformatted files
+fmt *flags:
+    {{ typstyle }} -l 100 {{ if flags == "--check" { "--check" } else if flags == "" { "-i" } else { error("unknown flag `" + flags + "`, expected `--check`") } }} {{ sources }}
 
 # Check spelling with typos
 spell:

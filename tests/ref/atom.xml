@@ -17,7 +17,7 @@
   </contributor>
   <category term="blog"/>
   <category term="typst" scheme="https://typst.app" label="Typst"/>
-  <generator uri="https://github.com/bfeitknecht/exemel" version="0.1.0">syndicate</generator>
+  <generator uri="https://github.com/bfeitknecht/syndicate" version="0.1.0">syndicate</generator>
   <icon>https://example.com/favicon.ico</icon>
   <rights>© 2026 Hachimi</rights>
   <entry>

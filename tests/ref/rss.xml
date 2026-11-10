@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Honey Drink</title>
+    <link>https://example.com/</link>
+    <description>Hachimi, hachimi, and hachimi</description>
+    <atom:link href="https://example.com/rss.xml" rel="self" type="application/rss+xml"/>
+    <language>en-us</language>
+    <copyright>© 2026 Hachimi</copyright>
+    <lastBuildDate>Wed, 01 Jul 2026 00:00:00 +0100</lastBuildDate>
+    <category>blog</category>
+    <generator>syndicate</generator>
+    <ttl>60</ttl>
+    <image>
+      <url>https://example.com/logo.png</url>
+      <title>Honey Drink</title>
+      <link>https://example.com/</link>
+    </image>
+    <item>
+      <title>Hayaku</title>
+      <link>https://example.com/blog/hayaku-naro/</link>
+      <description>Hachimi hachimi – "o namerudo"</description>
+      <content:encoded>&lt;p&gt;Ashiga ashiga &amp;amp; hayaku naro&lt;/p&gt;</content:encoded>
+      <author>namerudo@example.com (Hachimi)</author>
+      <category>umamusume</category>
+      <category>clannad</category>
+      <guid isPermaLink="true">https://example.com/blog/hayaku-naro/</guid>
+      <pubDate>Wed, 01 Jul 2026 00:00:00 +0100</pubDate>
+    </item>
+    <item>
+      <title>Typst &amp; XML</title>
+      <link>https://example.com/blog/typst-xml/</link>
+      <description>Plain string summary with &lt;angle brackets&gt;</description>
+      <author>namerudo@example.com (Hachimi)</author>
+      <guid isPermaLink="true">https://example.com/blog/typst-xml/</guid>
+      <pubDate>Thu, 15 Jan 2026 09:00:00 +0100</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -1,4 +1,2 @@
 .direnv
-target/
-*.wasm
 dist/

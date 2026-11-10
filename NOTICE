@@ -1,0 +1,9 @@
+syndicate
+Copyright 2026 Basil Feitknecht
+
+This product is a fork of exemel (https://github.com/wensimehrp/exemel),
+Copyright 2026 Jeremy Gao, licensed under the Apache License, Version 2.0.
+
+The original Rust/WebAssembly XML serializer has been replaced with a pure
+Typst implementation, and the public API has been redesigned. RSS 2.0 and
+sitemap support were added in this fork.

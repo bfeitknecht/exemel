@@ -1,0 +1,3 @@
+[files]
+# This file spells `namespace` incorrectly to test the error for unknown keys.
+extend-exclude = ["tests/fail/xml-unknown-key.typ"]

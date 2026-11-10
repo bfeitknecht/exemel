@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Example Blog</title>
+    <link>https://example.com/</link>
+    <description>Notes on typesetting, feeds and more</description>
+    <atom:link href="https://example.com/rss.xml" rel="self" type="application/rss+xml"/>
+    <language>en-us</language>
+    <copyright>© 2026 Ada Lovelace</copyright>
+    <lastBuildDate>Wed, 01 Jul 2026 00:00:00 +0100</lastBuildDate>
+    <category>blog</category>
+    <generator>syndicate</generator>
+    <ttl>60</ttl>
+    <image>
+      <url>https://example.com/logo.png</url>
+      <title>Example Blog</title>
+      <link>https://example.com/</link>
+    </image>
+    <item>
+      <title>Hello, world</title>
+      <link>https://example.com/blog/hello-world/</link>
+      <description>My first post – "finally"</description>
+      <content:encoded>&lt;p&gt;Welcome to my &lt;em&gt;new&lt;/em&gt; blog &amp;amp; feed.&lt;/p&gt;</content:encoded>
+      <author>ada@example.com (Ada Lovelace)</author>
+      <category>meta</category>
+      <category>typst</category>
+      <guid isPermaLink="true">https://example.com/blog/hello-world/</guid>
+      <pubDate>Wed, 01 Jul 2026 00:00:00 +0100</pubDate>
+    </item>
+    <item>
+      <title>Typst &amp; XML</title>
+      <link>https://example.com/blog/typst-xml/</link>
+      <description>Plain string summary with &lt;angle brackets&gt;</description>
+      <author>ada@example.com (Ada Lovelace)</author>
+      <guid isPermaLink="true">https://example.com/blog/typst-xml/</guid>
+      <pubDate>Thu, 15 Jan 2026 09:00:00 +0100</pubDate>
+    </item>
+  </channel>
+</rss>

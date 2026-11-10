@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Typst ${{ matrix.typst }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The minimum version (`compiler` in typst.toml) and the latest release.
+        typst: ["0.15.0", "latest"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: typst-community/setup-typst@v5
+        with:
+          typst-version: ${{ matrix.typst }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - name: Run the tests
+        run: just test
+      - name: Check the typst eval procedure of the manual
+        run: typst eval --root . --in tests/atom.typ 'query(<out>).first().value' | jq -j . | cmp - tests/ref/atom.xml
+      - name: Compile the manual
+        run: just manual
+
+  lint:
+    name: Format and spelling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just,typos
+      - name: Install typstyle
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL -o "$HOME/.local/bin/typstyle" \
+            https://github.com/typstyle-rs/typstyle/releases/download/v0.15.1/typstyle-x86_64-unknown-linux-gnu
+          chmod +x "$HOME/.local/bin/typstyle"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Check the format
+        run: just fmt --check
+      - name: Check the spelling
+        run: just spell

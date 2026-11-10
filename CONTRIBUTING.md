@@ -82,7 +82,7 @@ The recipe does these steps:
 3. It runs `just check`, which also compiles the manual again.
 4. It commits the changes, adds the tag `vX.Y.Z` and pushes the commit and the tag.
 
-The tag starts the release workflow (`.github/workflows/release.yml`). The workflow does these
+The tag starts the release workflow (`.github/workflows/release.yaml`). The workflow does these
 steps:
 
 1. It runs the tests and puts the package files into `dist`.

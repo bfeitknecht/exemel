@@ -29,5 +29,5 @@
   "<?xml version=\"1.0\" encoding=\"UTF-8\"?><sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><sitemap><loc>https://example.com/sitemap-pages.xml</loc></sitemap><sitemap><loc>https://example.com/sitemap-posts.xml</loc><lastmod>2026-07-03</lastmod></sitemap></sitemapindex>",
 )
 
-// No alternates → no xhtml namespace
+// Without alternates, there is no xhtml namespace.
 #assert(not sitemap.urlset("https://x/").contains("xhtml"))

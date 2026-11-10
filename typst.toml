@@ -16,7 +16,4 @@ exclude = [
   ".typos.toml",
   "CONTRIBUTING.md",
   "Justfile",
-  "flake.nix",
-  "flake.lock",
-  ".envrc",
 ]

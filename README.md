@@ -1,14 +1,14 @@
 # syndicate
 
-Generate **Atom feeds**, **RSS feeds** and **sitemaps** for websites built with Typst, and
-encode any Typst value to **XML**. Written in pure Typst, with no plugins.
+syndicate generates **Atom feeds**, **RSS feeds** and **sitemaps** for websites that you make
+with Typst. It also encodes Typst values to **XML**. It is written in pure Typst and does not use
+plugins.
 
-The [manual](docs/manual.pdf) covers everything in detail, with a guide and a full
-reference.
+The [manual](docs/manual.pdf) contains a guide and a full reference.
 
 ## Quick start
 
-Keep the metadata of your posts in one place and turn it into every format:
+Keep the data of your posts in one location. Then generate all formats from this data:
 
 ```typ
 #import "@preview/syndicate:0.1.0": atom, rss, sitemap
@@ -39,8 +39,8 @@ Keep the metadata of your posts in one place and turn it into every format:
 #let map = sitemap.urlset(site, posts.map(p => sitemap.url(url(p), lastmod: p.date)))
 ```
 
-Every document function returns the finished XML as a string. The Atom feed above starts like
-this:
+Each document function returns the complete XML as a string. The Atom feed above starts with
+these lines:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -58,10 +58,10 @@ this:
     ...
 ```
 
-## Writing the files
+## Write the files
 
-**With bundle export**, Typst 0.15's experimental target for multi-file output, the XML is
-written next to your HTML pages:
+**Bundle export** is the experimental output format of Typst 0.15 for more than one file. With
+bundle export, Typst writes the XML files together with your HTML pages:
 
 ```typ
 #asset("feed.xml", feed)
@@ -73,8 +73,8 @@ written next to your HTML pages:
 typst compile --features bundle --format bundle blog.typ site/
 ```
 
-**With `typst eval`**, expose the string with `#metadata(feed) <feed>` and extract it.
-`eval` prints JSON, so unwrap the string with `jq`:
+**With `typst eval`**, put the string into `#metadata(feed) <feed>`. Then get it with
+`typst eval`. The output of `eval` is JSON. Thus, use `jq` to get the string from the JSON:
 
 ```sh
 typst eval --in blog.typ 'query(<feed>).first().value' | jq -j . > feed.xml
@@ -90,41 +90,42 @@ typst eval --in blog.typ 'query(<feed>).first().value' | jq -j . > feed.xml
 | --- | --- |
 | `atom.feed(..)` | An Atom 1.0 feed (RFC 4287). |
 | `atom.entry(title, ..)` | An entry of an Atom feed. |
-| `atom.author(name, ..)` | A person, with optional email and URI. Plain strings work too. |
-| `atom.tag-uri(authority, date, specific)` | A permanent `tag:` URI (RFC 4151) to use as an ID. |
+| `atom.author(name, ..)` | A person, with an optional email and URI. You can also use a string. |
+| `atom.tag-uri(authority, date, specific)` | A permanent `tag:` URI (RFC 4151) for identifiers. |
 | `rss.feed(..)` | An RSS 2.0 feed. |
 | `rss.item(title, ..)` | An item of an RSS feed. |
-| `rss.enclosure(url, length: .., type: ..)` | A media attachment, such as a podcast episode. |
+| `rss.enclosure(url, length: .., type: ..)` | A media attachment, for example a podcast episode. |
 | `sitemap.urlset(..urls)` | A sitemap. |
 | `sitemap.url(loc, ..)` | A page of a sitemap, with `lastmod`, `changefreq`, `priority` and translations. |
-| `sitemap.index(..sitemaps)` | A sitemap index, listing several sitemaps. |
+| `sitemap.index(..sitemaps)` | A sitemap index, which lists more than one sitemap. |
 | `xml.encode(root, ..)` | Serializes a tree of nodes to XML. |
-| `xml.decode(source)` | Parses XML from a string, bytes or `path(..)` into the same tree. |
-| `xml.element(tag, ..)` | An element node, as an alternative to writing the dictionary. |
+| `xml.decode(source)` | Parses XML from a string, bytes or `path(..)` into a tree of nodes. |
+| `xml.element(tag, ..)` | An element node. You can use it instead of a dictionary. |
 | `xml.comment(body)` | A comment node. |
 | `xml.cdata(body)` | A CDATA section. |
 | `xml.pi(target, data)` | A processing instruction. |
-| `xml.raw(body)` | Pre-serialized markup, written verbatim. |
+| `xml.raw(body)` | Markup that is already serialized. `xml.encode` does not change it. |
 | `xml.escape(text)` | Escapes text for XML. |
-| `rfc3339(dt, tz: ..)` | Formats a date as used by Atom and sitemaps. |
-| `rfc2822(dt, tz: ..)` | Formats a date as used by RSS. |
+| `rfc3339(dt, tz: ..)` | Formats a date for Atom feeds and sitemaps. |
+| `rfc2822(dt, tz: ..)` | Formats a date for RSS feeds. |
 
-A few conventions apply throughout:
+These rules apply to all functions:
 
-- **Text** can be a string or simple markup like `[My _first_ post]`, which becomes plain text.
-  Markup without a plain-text form, such as an equation, is an error rather than silently
-  dropped.
-- **Dates** are `datetime` values or ISO 8601 strings like `"2026-07-01"` or
+- **Text** is a string or simple markup, for example `[My _first_ post]`. The functions convert
+  markup to plain text. If markup has no plain-text form, for example an equation, the functions
+  stop with an error. They do not remove it without a message.
+- **Dates** are `datetime` values or ISO 8601 strings, for example `"2026-07-01"` or
   `"2026-07-01T14:30"`.
-- **Time zones** are set once per document with `tz`, e.g. `tz: "+01:00"`. The default is UTC.
-- **Extensions** are supported through `namespaces` and `extra` on documents and entries, and
-  `stylesheet` makes browsers show a styled page instead of raw XML.
+- **Time zones** apply to a full document. Set them with `tz`, for example `tz: "+01:00"`. The
+  default is UTC.
+- **Extensions** use the options `namespaces` and `extra` of documents and entries. With
+  `stylesheet`, browsers show a page with styles, not the XML source.
 
 ## XML
 
-Elements are dictionaries with a `tag` and optional `attrs` and `children`, the same shape
-Typst's built-in `xml()` reader produces. Text is escaped automatically, attributes keep their
-order, and `none` attributes and children are omitted.
+An element is a dictionary with a `tag` and optional `attrs` and `children`. The `xml()` reader
+of Typst returns the same structure. `xml.encode` escapes text automatically and keeps the order
+of attributes. It ignores attributes and children that are `none`.
 
 ```typ
 #import "@preview/syndicate:0.1.0": xml
@@ -150,9 +151,10 @@ order, and `none` attributes and children are omitted.
 </book>
 ```
 
-`xml.decode` reads XML into the same structure, so documents can be modified and written back.
-Importing `xml` shadows the built-in `xml()` reader; it remains available as `std.xml`.
+`xml.decode` reads XML into the same structure. Thus, you can change a document and encode it
+again. When you import `xml`, it hides the `xml()` reader of Typst. To use the reader, write
+`std.xml`.
 
 ## License
 
-[MIT](LICENSE). syndicate was inspired by [exemel](https://github.com/wensimehrp/exemel) by Jeremy Gao.
+[MIT](LICENSE). The idea for syndicate came from [exemel](https://github.com/wensimehrp/exemel) by Jeremy Gao.

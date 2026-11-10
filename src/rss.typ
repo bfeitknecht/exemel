@@ -1,4 +1,4 @@
-// RSS 2.0 feeds (https://www.rssboard.org/rss-specification).
+// Functions that generate RSS 2.0 feeds (https://www.rssboard.org/rss-specification).
 
 #import "util.typ" as _util
 #import "xml.typ" as _xml
@@ -13,8 +13,8 @@
   (tag: tag, children: (_util.to-text(value, field: tag),))
 }
 
-/// Describes a media attachment, such as a podcast episode, for
-/// `rss.item(enclosure: ..)`. All three values are required.
+/// Describes a media attachment for `rss.item(enclosure: ..)`, for example a
+/// podcast episode. All three values are necessary.
 ///
 /// ```typc
 /// rss.enclosure(
@@ -28,9 +28,9 @@
 #let enclosure(
   /// The URL of the file. -> str
   url,
-  /// The file size in bytes. -> int
+  /// The size of the file in bytes. -> int
   length: none,
-  /// The MIME type, e.g. `"audio/mpeg"`. -> str
+  /// The MIME type, for example `"audio/mpeg"`. -> str
   type: none,
 ) = {
   if length == none or type == none {
@@ -46,7 +46,8 @@
   ))
 }
 
-// RSS wants `email (Name)` in <author>; names without an email go to <dc:creator>.
+// RSS uses the format `email (Name)` in <author>. If there is no email, the function
+// writes the name in <dc:creator>.
 #let _author(a) = {
   if a == none { return none }
   if type(a) != dictionary {
@@ -77,7 +78,7 @@
   )
 }
 
-/// Describes an item, for `rss.feed(items: ..)`.
+/// Describes an item for `rss.feed(items: ..)`.
 ///
 /// ```typc
 /// rss.item(
@@ -90,32 +91,34 @@
 ///
 /// -> dictionary
 #let item(
-  /// The title. May be `none` if there is a `description`. -> str | content | none
+  /// The title. It can be `none` if there is a `description`. -> str | content | none
   title,
-  /// The URL of the item's web page. -> str | none
+  /// The URL of the web page of the item. -> str | none
   link: none,
-  /// A unique identifier. Defaults to `link`. -> str | auto | none
+  /// A unique identifier. The default is `link`. -> str | auto | none
   guid: auto,
-  /// Whether `guid` is a URL that points to the item. By default `true` for
-  /// `http(s)://` identifiers. -> bool | auto
+  /// If `true`, `guid` is a URL of the item. The default is `true` for
+  /// identifiers that start with `http://` or `https://`. -> bool | auto
   permalink: auto,
-  /// When the item was published. -> datetime | str | none
+  /// The date of publication. -> datetime | str | none
   published: none,
-  /// A summary or the full text. HTML source is allowed; it is escaped as required. -> str | content | none
+  /// A summary or the full text. It can contain HTML source. The function escapes it.
+  /// -> str | content | none
   description: none,
-  /// The full content as HTML source, written as `<content:encoded>`. -> str | none
+  /// The full content as HTML source. The function writes it as `<content:encoded>`.
+  /// -> str | none
   content: none,
-  /// The author: a dictionary `(name: .., email: ..)`, an `atom.author(..)`,
-  /// or a string. Authors with an email are written as `<author>`, names
-  /// alone as `<dc:creator>`. -> dictionary | str | none
+  /// The author, as a dictionary `(name: .., email: ..)`, an `atom.author(..)`
+  /// or a string. If the author has an email, the function writes `<author>`.
+  /// If not, it writes the name as `<dc:creator>`. -> dictionary | str | none
   author: none,
-  /// The categories: strings, or dictionaries `(name: .., domain: ..)`. -> array
+  /// The categories, as strings or dictionaries `(name: .., domain: ..)`. -> array
   categories: (),
-  /// The URL of the item's comments. -> str | none
+  /// The URL of the comments on the item. -> str | none
   comments: none,
-  /// A media attachment, created with `rss.enclosure(..)`. -> dictionary | none
+  /// A media attachment. Make it with `rss.enclosure(..)`. -> dictionary | none
   enclosure: none,
-  /// Additional XML nodes appended to the item. -> array
+  /// More XML nodes. The function adds them at the end of the item. -> array
   extra: (),
 ) = {
   if title == none and description == none {
@@ -165,15 +168,15 @@
   ),
 )
 
-// Whether any element in the tree uses the namespace prefix.
+// Returns `true` if an element in the tree uses the namespace prefix.
 #let _uses(tree, prefix) = {
   if type(tree) == array { return tree.any(t => _uses(t, prefix)) }
   if type(tree) != dictionary or "tag" not in tree { return false }
   str(tree.tag).starts-with(prefix + ":") or _uses(tree.at("children", default: ()), prefix)
 }
 
-/// Generates an RSS 2.0 feed. The `atom`, `content` and `dc` namespaces are
-/// declared automatically when they are used.
+/// Generates an RSS 2.0 feed. If the feed uses the `atom`, `content` or `dc`
+/// namespace, the function declares it automatically.
 ///
 /// ```examplec
 /// rss.feed(
@@ -190,50 +193,53 @@
 ///
 /// -> str
 #let feed(
-  /// The feed's title. Required. -> str | content
+  /// The title of the feed. This value is necessary. -> str | content
   title: none,
-  /// The URL of the website. Required. -> str
+  /// The URL of the website. This value is necessary. -> str
   link: none,
-  /// A description of the feed. Required. -> str | content
+  /// A description of the feed. This value is necessary. -> str | content
   description: none,
-  /// The URL where this feed is published, written as
-  /// `<atom:link rel="self">`. Recommended. -> str | none
+  /// The URL of this feed. The function writes it as `<atom:link rel="self">`.
+  /// Set it if possible. -> str | none
   self-link: none,
-  /// The language of the feed, e.g. `"en-us"`. -> str | none
+  /// The language of the feed, for example `"en-us"`. -> str | none
   language: none,
-  /// A copyright notice. -> str | content | none
+  /// A copyright statement. -> str | content | none
   copyright: none,
   /// The email address of the editor. -> str | none
   managing-editor: none,
-  /// The email address of the webmaster. -> str | none
+  /// The email address of the person who operates the website. -> str | none
   web-master: none,
-  /// When the feed's content was published. -> datetime | str | none
+  /// The date of publication of the feed content. -> datetime | str | none
   published: none,
-  /// When the feed last changed (`<lastBuildDate>`). Defaults to the latest
-  /// `published` of the items; `none` omits it. -> datetime | str | auto | none
+  /// The date of the last change (`<lastBuildDate>`). The default is the latest
+  /// `published` of the items. If `none`, the function does not write it.
+  /// -> datetime | str | auto | none
   updated: auto,
-  /// The categories: strings, or dictionaries `(name: .., domain: ..)`. -> array
+  /// The categories, as strings or dictionaries `(name: .., domain: ..)`. -> array
   categories: (),
   /// The software that generated the feed. -> str | none
   generator: none,
   /// The URL of the RSS specification. -> str | none
   docs: none,
-  /// How many minutes the feed may be cached. -> int | none
+  /// The maximum time in minutes that a reader can keep the feed in a cache. -> int | none
   ttl: none,
-  /// An image: a URL, or a dictionary `(url: .., title: .., link: .., width: .., height: ..)`.
-  /// `title` and `link` default to those of the feed. -> str | dictionary | none
+  /// An image, as a URL or a dictionary
+  /// `(url: .., title: .., link: .., width: .., height: ..)`. The default `title`
+  /// and `link` are those of the feed. -> str | dictionary | none
   image: none,
-  /// The items, created with `rss.item(..)`. -> array
+  /// The items. Make them with `rss.item(..)`. -> array
   items: (),
-  /// The time zone of all dates: `"Z"` for UTC, or an offset like `"+01:00"`. -> str
+  /// The time zone of all dates. Use `"Z"` for UTC, or an offset, for example `"+01:00"`.
+  /// -> str
   tz: "Z",
-  /// The URL of an XSL or CSS stylesheet that browsers apply to the feed. -> str | none
+  /// The URL of an XSL or CSS stylesheet. Browsers apply it to the feed. -> str | none
   stylesheet: none,
-  /// Additional namespace declarations `(prefix: uri)`, for elements in `extra`. -> dictionary
+  /// More namespace declarations `(prefix: uri)` for the elements in `extra`. -> dictionary
   namespaces: (:),
-  /// Additional XML nodes appended to the channel. -> array
+  /// More XML nodes. The function adds them at the end of the channel. -> array
   extra: (),
-  /// Whether to indent the output. -> bool
+  /// If `true`, the function indents the output. -> bool
   pretty: true,
 ) = {
   if title == none { panic("`title` is required") }

@@ -1,4 +1,4 @@
-// syndicate: encode XML, and generate Atom feeds, RSS feeds and sitemaps.
+// syndicate encodes XML and generates Atom feeds, RSS feeds and sitemaps.
 
 #import "src/xml.typ"
 #import "src/atom.typ"

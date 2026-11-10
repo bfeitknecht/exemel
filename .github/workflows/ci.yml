@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The minimum supported version (`compiler` in typst.toml) and the latest release.
+        # The minimum version (`compiler` in typst.toml) and the latest release.
         typst: ["0.15.0", "latest"]
     steps:
       - uses: actions/checkout@v7
@@ -21,11 +21,11 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just
-      - name: Run tests
+      - name: Run the tests
         run: just test
-      - name: Check the documented typst eval workflow
+      - name: Check the typst eval procedure of the manual
         run: typst eval --root . --in tests/atom.typ 'query(<out>).first().value' | jq -j . | cmp - tests/ref/atom.xml
-      - name: Build the manual
+      - name: Compile the manual
         run: just manual
 
   lint:
@@ -43,7 +43,7 @@ jobs:
             https://github.com/typstyle-rs/typstyle/releases/download/v0.15.1/typstyle-x86_64-unknown-linux-gnu
           chmod +x "$HOME/.local/bin/typstyle"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Check formatting
+      - name: Check the format
         run: just fmt --check
-      - name: Check spelling
+      - name: Check the spelling
         run: just spell

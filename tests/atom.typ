@@ -33,7 +33,7 @@
 #metadata(out) <out>
 #if "update" not in sys.inputs { assert.eq(out, read("ref/atom.xml")) }
 
-// Entry-level authors make feed-level authors optional; `updated` is inferred.
+// If each entry has authors, the feed can have no authors. The function calculates `updated`.
 #let minimal = atom.feed(
   title: "Minimal",
   link: "https://example.org",
@@ -50,11 +50,11 @@
   "<?xml version=\"1.0\" encoding=\"UTF-8\"?><feed xmlns=\"http://www.w3.org/2005/Atom\"><title>Minimal</title><link rel=\"alternate\" type=\"text/html\" href=\"https://example.org\"/><id>https://example.org</id><updated>2026-02-03T00:00:00Z</updated><entry><title>Only</title><link rel=\"alternate\" type=\"text/html\" href=\"https://example.org/only\"/><id>https://example.org/only</id><updated>2026-02-03T00:00:00Z</updated><published>2026-02-03T00:00:00Z</published><author><name>Someone</name></author></entry></feed>",
 )
 
-// Typst content as entry content becomes plain text with type="text".
+// The function converts Typst content in an entry to plain text with type="text".
 #let e = atom.entry("T", link: "https://x", updated: "2026-01-01", content: [Some *content*])
 #assert.eq(e.content-type, "text")
 
-// Custom namespaces and extra nodes
+// More namespaces and XML nodes
 #let ext = atom.feed(
   title: "Ext",
   link: "https://x",

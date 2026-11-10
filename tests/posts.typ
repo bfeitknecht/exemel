@@ -1,4 +1,4 @@
-// Shared fixture: the kind of post metadata a blog keeps, mapped to every format.
+// Post data, as a blog keeps it. The feed and sitemap tests use this data.
 #let site = "https://example.com/"
 #let posts = (
   (

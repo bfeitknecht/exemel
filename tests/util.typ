@@ -23,11 +23,11 @@
   second: 0,
 ))
 
-// tag: URIs
+// `tag:` URIs
 #assert.eq(atom.tag-uri("example.com", d, "blog/post"), "tag:example.com,2026-07-01:blog/post")
 #assert.eq(atom.tag-uri("me@example.com", "2026-01-01", ""), "tag:me@example.com,2026-01-01:")
 
-// Plain-text conversion
+// Conversion to plain text
 #assert.eq(to-text("plain"), "plain")
 #assert.eq(to-text(42), "42")
 #assert.eq(to-text(sym.arrow.r), "→")

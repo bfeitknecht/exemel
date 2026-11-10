@@ -1,13 +1,13 @@
-// Internal helpers shared by all modules. Not part of the public API, except
-// for `rfc3339` and `rfc2822`, which `lib.typ` re-exports.
+// Internal functions for all modules. They are not part of the public API.
+// Only `rfc3339` and `rfc2822` are public, because `lib.typ` exports them.
 
 // Arrays and strings
 
-/// Concatenates strings; unlike `array.join`, returns `""` for an empty array.
+/// Concatenates strings. For an empty array, it returns `""`, not `none` as `array.join` does.
 #let concat(parts) = if parts.len() == 0 { "" } else { parts.join() }
 
-/// Flattens nested arrays and drops `none`. A single non-array value is
-/// treated as a one-element array.
+/// Flattens nested arrays and removes `none`. If the value is not an array,
+/// the function uses it as an array with one item.
 #let flatten(items) = {
   if type(items) != array { items = (items,) }
   let out = ()
@@ -27,7 +27,7 @@
   [a]
 }.func()
 
-// Elements whose plain text is the plain text of their `body`.
+// Elements that have the same plain text as their `body`.
 #let _wrappers = (
   strong,
   emph,
@@ -62,7 +62,7 @@
   } else if f == _styled {
     _content-to-text(c.child, field)
   } else if c.has("text") and type(c.text) == str {
-    // `text`, `raw`, symbols and shorthands like `--`
+    // `text`, `raw`, symbols and shorthands, for example `--`
     c.text
   } else if f in _wrappers and c.has("body") {
     if type(c.body) == content { _content-to-text(c.body, field) } else { str(c.body) }
@@ -78,8 +78,9 @@
   }
 }
 
-/// Converts strings, numbers, symbols and simple markup to plain text.
-/// Anything without a faithful plain-text form is an error, never dropped.
+/// Converts strings, numbers, symbols and simple markup to plain text. If a
+/// value has no correct plain-text form, the function stops with an error. It
+/// does not remove the value without a message.
 #let to-text(v, field: "value") = {
   let t = type(v)
   if t == str {
@@ -93,15 +94,16 @@
   }
 }
 
-/// Like `to-text`, but passes `none` through.
+/// The same as `to-text`, but returns `none` for `none`.
 #let opt-text(v, field: "value") = if v == none { none } else { to-text(v, field: field) }
 
 // Dates
 
 #let _iso-re = regex("^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$")
 
-/// Turns a `datetime` or an ISO 8601 string without time zone
-/// (`2026-07-01`, `2026-07-01T14:30`, `2026-07-01T14:30:00`) into a `datetime`.
+/// Changes a `datetime` or an ISO 8601 string without a time zone to a
+/// `datetime`. Examples of strings: `2026-07-01`, `2026-07-01T14:30` and
+/// `2026-07-01T14:30:00`.
 #let to-datetime(v, field: "date") = {
   if type(v) == datetime {
     if v.year() == none {
@@ -138,17 +140,17 @@
   }
 }
 
-/// Like `to-datetime`, but passes `none` through.
+/// The same as `to-datetime`, but returns `none` for `none`.
 #let opt-datetime(v, field: "date") = if v == none { none } else { to-datetime(v, field: field) }
 
 #let has-time(dt) = dt.hour() != none
 
-/// Fills in a missing time with midnight.
+/// Adds the time 00:00:00 to a date that has no time.
 #let with-time(dt) = if has-time(dt) { dt } else {
   datetime(year: dt.year(), month: dt.month(), day: dt.day(), hour: 0, minute: 0, second: 0)
 }
 
-/// The latest of an array of datetimes (ignoring `none`), or `none`.
+/// Returns the latest date in an array, or `none` if there is no date. The function ignores `none`.
 #let latest(dts) = {
   let dts = dts.filter(d => d != none)
   if dts.len() == 0 { return none }
@@ -157,7 +159,7 @@
 
 #let _tz-re = regex("^([+-])(\d{2}):?(\d{2})$")
 
-// Parses a time zone into `none` (UTC) or `(sign, hours, minutes)`.
+// Parses a time zone. Returns `none` for UTC, or `(sign, hours, minutes)`.
 #let _parse-tz(tz) = {
   if type(tz) != str {
     panic("`tz` must be a string like \"Z\", \"+01:00\" or \"-0530\", found " + str(type(tz)))
@@ -175,8 +177,8 @@
   if int(hh) == 0 and int(mm) == 0 { none } else { (sign, hh, mm) }
 }
 
-/// Formats a date as an RFC 3339 timestamp, as used by Atom feeds and
-/// sitemaps. Dates without a time get `00:00:00`.
+/// Formats a date as an RFC 3339 timestamp. Atom feeds and sitemaps use this
+/// format. If the date has no time, the function uses `00:00:00`.
 ///
 /// ```examplec
 /// rfc3339("2026-07-01T14:30", tz: "+02:00")
@@ -186,7 +188,7 @@
 #let rfc3339(
   /// The date. -> datetime | str
   dt,
-  /// The time zone the date is in: `"Z"` for UTC, or an offset like
+  /// The time zone of the date. Use `"Z"` for UTC, or an offset, for example
   /// `"+01:00"` or `"-0530"`. -> str
   tz: "Z",
 ) = {
@@ -196,8 +198,8 @@
   dt.display("[year]-[month]-[day]T[hour]:[minute]:[second]") + suffix
 }
 
-/// Formats a date as an RFC 2822 timestamp, as used by RSS feeds. Dates
-/// without a time get `00:00:00`.
+/// Formats a date as an RFC 2822 timestamp. RSS feeds use this format. If the
+/// date has no time, the function uses `00:00:00`.
 ///
 /// ```examplec
 /// rfc2822("2026-07-01T14:30", tz: "+02:00")
@@ -207,7 +209,7 @@
 #let rfc2822(
   /// The date. -> datetime | str
   dt,
-  /// The time zone the date is in: `"Z"` for UTC, or an offset like
+  /// The time zone of the date. Use `"Z"` for UTC, or an offset, for example
   /// `"+01:00"` or `"-0530"`. -> str
   tz: "Z",
 ) = {
@@ -220,13 +222,13 @@
   )
 }
 
-/// W3C datetime, as used by sitemaps: dates without a time stay date-only.
+/// Formats a date as a W3C datetime for sitemaps. If the date has no time, the result also has no time.
 #let w3c(dt, tz: "Z") = {
   let dt = to-datetime(dt, field: "lastmod")
   if has-time(dt) { rfc3339(dt, tz: tz) } else { dt.display("[year]-[month]-[day]") }
 }
 
-// Records returned by builder functions such as `atom.entry`
+// Records that functions such as `atom.entry` return
 
 #let record(kind, fields) = (syndicate: kind) + fields
 
@@ -239,9 +241,9 @@
   v
 }
 
-// Document helpers
+// Functions for documents
 
-/// A `<?xml-stylesheet?>` processing instruction for `href`, or `none`.
+/// Returns a `<?xml-stylesheet?>` processing instruction for `href`, or `none`.
 #let stylesheet-pi(href) = {
   if href == none { return none }
   let href = to-text(href, field: "stylesheet")
@@ -250,7 +252,7 @@
   (pi: "xml-stylesheet", data: "type=\"" + kind + "\" href=\"" + href + "\"")
 }
 
-/// Turns `(prefix: uri)` into `("xmlns:prefix": uri)` attributes.
+/// Changes `(prefix: uri)` to the attributes `("xmlns:prefix": uri)`.
 #let xmlns-attrs(namespaces) = {
   let out = (:)
   for (prefix, uri) in namespaces {

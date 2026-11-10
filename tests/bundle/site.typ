@@ -1,4 +1,4 @@
-// Writes the reference documents in tests/ref with bundle export; see
+// Writes the reference documents in tests/ref with bundle export. Refer to
 // `just test --update`.
 
 #import "../atom.typ" as atom-test

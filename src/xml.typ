@@ -1,4 +1,4 @@
-// XML encoding and decoding.
+// Functions that encode and decode XML.
 
 #import "util.typ" as _util
 
@@ -20,8 +20,8 @@
   name
 }
 
-/// Escapes text for use as XML character data: `&`, `<` and `>` become
-/// entity references.
+/// Escapes text for XML character data. The function changes `&`, `<` and
+/// `>` to entity references.
 ///
 /// ```examplec
 /// xml.escape("Fish & <Chips>")
@@ -46,8 +46,8 @@
     .replace("\r", "&#13;")
 }
 
-/// Builds an element node. Equivalent to writing the dictionary
-/// `(tag: tag, attrs: attrs, children: children)` yourself.
+/// Makes an element node. The result is the same as the dictionary
+/// `(tag: tag, attrs: attrs, children: children)`.
 ///
 /// ```examplec
 /// xml.element("a", attrs: (href: "/"), "Home")
@@ -55,9 +55,9 @@
 ///
 /// -> dictionary
 #let element(
-  /// The element name, optionally with a namespace prefix like `"atom:link"`. -> str
+  /// The element name. It can have a namespace prefix, for example `"atom:link"`. -> str
   tag,
-  /// The attributes. Attributes set to `none` are omitted. -> dictionary
+  /// The attributes. The function does not write attributes that are `none`. -> dictionary
   attrs: (:),
   /// The child nodes. -> str | content | dictionary | array | none
   ..children,
@@ -72,7 +72,7 @@
   (tag: tag, attrs: attrs, children: children.pos())
 }
 
-/// A comment node, written as `<!--body-->`.
+/// Makes a comment node. `xml.encode` writes it as `<!--body-->`.
 ///
 /// ```examplec
 /// xml.encode(
@@ -83,12 +83,13 @@
 ///
 /// -> dictionary
 #let comment(
-  /// The comment text. It must not contain `--` or end with `-`. -> str
+  /// The comment text. It must not contain `--`, and it must not end with `-`. -> str
   body,
 ) = (comment: body)
 
-/// A CDATA section, written as `<![CDATA[body]]>`. Occurrences of `]]>` are
-/// split across two sections, so any text is safe.
+/// Makes a CDATA section. `xml.encode` writes it as `<![CDATA[body]]>`. If the
+/// text contains `]]>`, the function divides the text into two sections. Thus,
+/// all text is safe.
 ///
 /// ```examplec
 /// xml.encode(
@@ -103,7 +104,7 @@
   body,
 ) = (cdata: body)
 
-/// A processing instruction, written as `<?target data?>`.
+/// Makes a processing instruction. `xml.encode` writes it as `<?target data?>`.
 ///
 /// ```examplec
 /// xml.encode(
@@ -114,14 +115,14 @@
 ///
 /// -> dictionary
 #let pi(
-  /// The target, e.g. `"xml-stylesheet"`. -> str
+  /// The target, for example `"xml-stylesheet"`. -> str
   target,
-  /// The instruction's data. It must not contain `?>`. -> str | none
+  /// The data of the instruction. It must not contain `?>`. -> str | none
   data,
 ) = (pi: target, data: data)
 
-/// Pre-serialized markup, written verbatim. You are responsible for it being
-/// well-formed.
+/// Makes a node from markup that is already serialized. `xml.encode` writes
+/// the markup without changes. Make sure that the markup is well-formed.
 ///
 /// ```examplec
 /// xml.encode(
@@ -136,7 +137,7 @@
   body,
 ) = (raw: body)
 
-// The kind of a node: "text", "element", "comment", "cdata", "pi" or "raw".
+// Returns the kind of a node: "text", "element", "comment", "cdata", "pi" or "raw".
 #let _kind(node) = {
   let t = type(node)
   if t in (str, content, int, float, decimal, symbol) {
@@ -203,15 +204,16 @@
   "<?" + target + (if data == "" { "" } else { " " + data }) + "?>"
 }
 
-// Returns the start tag without its closing `>` or `/>`, and the default
-// namespace in scope for the element's children.
+// Returns the start tag without the `>` or `/>` at the end. Also returns the
+// default namespace for the children of the element.
 #let _start-tag(node, tag, default-ns) = {
   let attrs = node.at("attrs", default: (:))
   if type(attrs) != dictionary {
     panic("`attrs` of element `" + tag + "` must be a dictionary, found " + str(type(attrs)))
   }
-  // Decoded elements carry their namespace URI. Declare it as the default
-  // namespace wherever it changes, so namespaced documents round-trip.
+  // A decoded element contains its namespace URI. Declare the URI as the
+  // default namespace where it changes. Then the encoded document keeps the
+  // namespaces of the decoded document.
   let ns = default-ns
   let parts = ()
   if "xmlns" in attrs {
@@ -232,13 +234,13 @@
   ("<" + tag + _util.concat(parts), ns)
 }
 
-// Serializes a node. Works with an explicit stack instead of recursion, so
-// deep trees don't hit Typst's call depth limit. The stack holds output
-// strings and `(node, depth, default-ns, pretty)` tasks.
+// Serializes a node. The function uses a stack, not recursion. Thus, deep
+// trees do not go above the call depth limit of Typst. The stack contains
+// output strings and tasks `(node, depth, default-ns, pretty)`.
 #let _render(root, pretty, pad) = {
   let out = ()
   let stack = ((root, 0, none, pretty),)
-  // Typst stops `while` loops after 10 000 iterations, so work in batches.
+  // Typst stops a `while` loop after 10 000 iterations. Thus, do the work in batches.
   while stack.len() > 0 {
     for _ in range(4096) {
       if stack.len() == 0 { break }
@@ -261,7 +263,7 @@
         continue
       }
       out.push(open + ">")
-      // Only indent element-only content: whitespace next to text would change it.
+      // Indent only elements that contain only elements. Whitespace adjacent to text changes the text.
       let mixed = children.any(c => _kind(c) in ("text", "cdata", "raw"))
       let tasks = ()
       if pretty and not mixed {
@@ -285,11 +287,11 @@
 
 /// Serializes a tree of nodes to an XML document.
 ///
-/// Elements are dictionaries `(tag: .., attrs: .., children: ..)`, where
-/// `attrs` and `children` are optional. Text is given as strings, numbers or
-/// simple content and is escaped automatically. Children set to `none` are
-/// skipped and nested arrays are flattened, so `if` and `.map(..)` can be
-/// used inline.
+/// An element is a dictionary `(tag: .., attrs: .., children: ..)`. You can
+/// leave out `attrs` and `children`. Text is a string, a number or simple
+/// content. The function escapes text automatically. It ignores children that
+/// are `none` and flattens nested arrays. Thus, you can use `if` and
+/// `.map(..)` in the list of children.
 ///
 /// ```examplec
 /// xml.encode(
@@ -307,21 +309,22 @@
 ///
 /// -> str
 #let encode(
-  /// The root element, or an array of top-level nodes: exactly one element,
-  /// optionally surrounded by comments and processing instructions.
+  /// The root element, or an array of top-level nodes. The array must contain
+  /// one element. It can also contain comments and processing instructions.
   /// -> dictionary | array
   root,
-  /// Whether to indent elements that contain only other elements. Text
-  /// content is never altered. -> bool
+  /// If `true`, the function indents elements that contain only elements. It
+  /// does not change text. -> bool
   pretty: false,
-  /// The indentation per level when `pretty` is set: a number of spaces, or a
-  /// string such as `"\t"`. -> int | str
+  /// The indentation for each level if `pretty` is `true`. Use a number of
+  /// spaces or a string, for example `"\t"`. -> int | str
   indent: 2,
-  /// `true` for `<?xml version="1.0" encoding="UTF-8"?>`, `false` for no
-  /// declaration, or a custom declaration. -> bool | str
+  /// The XML declaration. Use `true` for `<?xml version="1.0" encoding="UTF-8"?>`,
+  /// `false` for no declaration, or a string for a different declaration.
+  /// -> bool | str
   declaration: true,
 ) = {
-  // Whitespace between top-level nodes (as returned by the reader) is insignificant.
+  // The reader returns whitespace between top-level nodes. This whitespace is not important.
   let nodes = _util.flatten(root).filter(n => not (type(n) == str and n.trim() == ""))
   let kinds = nodes.map(_kind)
   let elements = kinds.filter(k => k == "element").len()
@@ -344,10 +347,13 @@
   if pretty { parts.join("\n") + "\n" } else { parts.join() }
 }
 
-// Rebuilds the reader's output without the empty-tag placeholders it produces
-// for comments and processing instructions. Iterative, like `_render`. Each
-// frame holds the element being rebuilt (`none` at the top level), its
-// finished children and its remaining children in reverse order.
+// Makes the output of the reader again, without the placeholders that have
+// an empty tag. The reader makes these placeholders for comments and
+// processing instructions. The function uses a stack, as `_render` does. Each
+// frame contains three items:
+// - the element that the function makes again (`none` at the top level)
+// - the children that are complete
+// - the children that the function did not examine yet, in reverse order
 #let _strip-placeholders(nodes) = {
   let stack = ((node: none, done: (), todo: nodes.rev()),)
   while true {
@@ -372,13 +378,14 @@
   }
 }
 
-/// Parses XML into the node structure used by `xml.encode`, using Typst's
-/// built-in reader.
+/// Parses XML into the node structure of `xml.encode`. The function uses the
+/// XML reader of Typst.
 ///
-/// Elements are returned as `(namespace: .., tag: .., attrs: .., children: ..)`,
-/// where `namespace` is the element's namespace URI, which `xml.encode` turns
-/// back into `xmlns` declarations. The reader drops comments, processing
-/// instructions and namespace prefixes.
+/// The function returns each element as
+/// `(namespace: .., tag: .., attrs: .., children: ..)`. The `namespace` is the
+/// namespace URI of the element. `xml.encode` changes it back to `xmlns`
+/// declarations. The reader removes comments, processing instructions and
+/// namespace prefixes.
 ///
 /// ```examplec
 /// xml.decode("<p>Hello <b>world</b></p>")
@@ -386,9 +393,9 @@
 ///
 /// -> array
 #let decode(
-  /// The XML as a string or bytes, or a `path(..)` to a file. Use `path`
-  /// rather than a plain file name, so that the file is found relative to
-  /// your document instead of this package. -> str | bytes | path
+  /// The XML as a string or bytes, or a `path(..)` to a file. For a file, use
+  /// `path`, not only the file name. Then Typst finds the file relative to your
+  /// document, not relative to this package. -> str | bytes | path
   source,
 ) = {
   let data = if type(source) == str { bytes(source) } else { source }

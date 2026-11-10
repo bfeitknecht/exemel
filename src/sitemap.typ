@@ -1,4 +1,4 @@
-// XML sitemaps (https://www.sitemaps.org/protocol.html).
+// Functions that generate XML sitemaps (https://www.sitemaps.org/protocol.html).
 
 #import "util.typ" as _util
 #import "xml.typ" as _xml
@@ -8,7 +8,7 @@
 #let _max-entries = 50000
 #let _changefreqs = ("always", "hourly", "daily", "weekly", "monthly", "yearly", "never")
 
-/// Describes a page, for `sitemap.urlset(..)`, or a sitemap, for
+/// Describes a page for `sitemap.urlset(..)`, or a sitemap for
 /// `sitemap.index(..)`.
 ///
 /// ```typc
@@ -21,20 +21,21 @@
 ///
 /// -> dictionary
 #let url(
-  /// The page's canonical URL. -> str
+  /// The canonical URL of the page. -> str
   loc,
-  /// When the page last changed. Dates without a time are written as
-  /// `YYYY-MM-DD`. -> datetime | str | none
+  /// The date of the last change. If the date has no time, the function writes
+  /// it as `YYYY-MM-DD`. -> datetime | str | none
   lastmod: none,
-  /// How often the page changes: `"always"`, `"hourly"`, `"daily"`,
-  /// `"weekly"`, `"monthly"`, `"yearly"` or `"never"`. -> str | none
+  /// The frequency of changes: `"always"`, `"hourly"`, `"daily"`, `"weekly"`,
+  /// `"monthly"`, `"yearly"` or `"never"`. -> str | none
   changefreq: none,
-  /// The page's priority relative to your other pages, from `0` to `1`. -> int | float | none
+  /// The priority of the page, relative to your other pages. Use a number from `0` to `1`.
+  /// -> int | float | none
   priority: none,
-  /// Translations of the page as `(hreflang: url)`, e.g.
+  /// Translations of the page as `(hreflang: url)`, for example
   /// `(de: "https://example.com/de/", "x-default": "https://example.com/")`. -> dictionary
   alternates: (:),
-  /// Additional XML nodes appended to the entry. -> array
+  /// More XML nodes. The function adds them at the end of the entry. -> array
   extra: (),
 ) = {
   if changefreq != none and changefreq not in _changefreqs {
@@ -79,9 +80,9 @@
   (tag: "lastmod", children: (_util.w3c(u.lastmod, tz: tz),))
 }
 
-/// Generates a sitemap listing the pages of a website. Sitemaps are limited
-/// to 50 000 URLs; split larger sites and list the parts with
-/// `sitemap.index`.
+/// Generates a sitemap, which lists the pages of a website. A sitemap can
+/// contain a maximum of 50 000 URLs. For a larger website, divide the list into
+/// more than one sitemap. Then list the sitemaps with `sitemap.index`.
 ///
 /// ```examplec
 /// sitemap.urlset(
@@ -92,15 +93,17 @@
 ///
 /// -> str
 #let urlset(
-  /// The pages: `sitemap.url(..)` or plain URL strings, as arguments or arrays. -> dictionary | str | array
+  /// The pages, as `sitemap.url(..)` or URL strings. Give them as arguments or arrays.
+  /// -> dictionary | str | array
   ..urls,
-  /// The time zone of dates with a time: `"Z"` for UTC, or an offset like `"+01:00"`. -> str
+  /// The time zone of dates that have a time. Use `"Z"` for UTC, or an offset, for example
+  /// `"+01:00"`. -> str
   tz: "Z",
-  /// The URL of an XSL or CSS stylesheet that browsers apply to the sitemap. -> str | none
+  /// The URL of an XSL or CSS stylesheet. Browsers apply it to the sitemap. -> str | none
   stylesheet: none,
-  /// Additional namespace declarations `(prefix: uri)`, for elements in `extra`. -> dictionary
+  /// More namespace declarations `(prefix: uri)` for the elements in `extra`. -> dictionary
   namespaces: (:),
-  /// Whether to indent the output. -> bool
+  /// If `true`, the function indents the output. -> bool
   pretty: true,
 ) = {
   let urls = _entries(urls.pos(), "urlset")
@@ -133,7 +136,7 @@
   _xml.encode((_util.stylesheet-pi(stylesheet), root), pretty: pretty)
 }
 
-/// Generates a sitemap index, which lists several sitemaps.
+/// Generates a sitemap index, which lists more than one sitemap.
 ///
 /// ```examplec
 /// sitemap.index(
@@ -144,13 +147,15 @@
 ///
 /// -> str
 #let index(
-  /// The sitemaps: URL strings, or `sitemap.url(loc, lastmod: ..)`. -> dictionary | str | array
+  /// The sitemaps, as URL strings or `sitemap.url(loc, lastmod: ..)`.
+  /// -> dictionary | str | array
   ..sitemaps,
-  /// The time zone of dates with a time: `"Z"` for UTC, or an offset like `"+01:00"`. -> str
+  /// The time zone of dates that have a time. Use `"Z"` for UTC, or an offset, for example
+  /// `"+01:00"`. -> str
   tz: "Z",
-  /// The URL of an XSL or CSS stylesheet that browsers apply to the index. -> str | none
+  /// The URL of an XSL or CSS stylesheet. Browsers apply it to the index. -> str | none
   stylesheet: none,
-  /// Whether to indent the output. -> bool
+  /// If `true`, the function indents the output. -> bool
   pretty: true,
 ) = {
   let sitemaps = _entries(sitemaps.pos(), "index")

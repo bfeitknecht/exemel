@@ -1,0 +1,136 @@
+# Publishes a release when `just release` pushes a tag `v<version>`.
+#
+# Necessary configuration in the repository settings:
+# - Secret PACKAGES_TOKEN: a classic personal access token with the scopes
+#   `public_repo` and `workflow`. The token user opens the pull request.
+# - Variable PACKAGES_FORK (optional): the fork of typst/packages that gets the
+#   release branch. The default is `<repository owner>/packages`.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGES_FORK: ${{ vars.PACKAGES_FORK || format('{0}/packages', github.repository_owner) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: typst-community/setup-typst@v5
+        with:
+          typst-version: latest
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
+      - name: Read the version
+        id: version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' typst.toml)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME does not agree with version $version in typst.toml."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Run the tests
+        run: just test
+
+      - name: Make the package
+        run: just package
+
+      - name: Write the release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v heading="## $VERSION " '
+            /^## / { if (found) exit }
+            index($0, heading) == 1 { found = 1; next }
+            found
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Make the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" docs/manual.pdf \
+            --verify-tag --title "syndicate $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+
+      - name: Open a pull request to typst/packages
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Add the secret PACKAGES_TOKEN to the repository."
+            exit 1
+          fi
+          branch="syndicate-$VERSION"
+
+          # Make the fork equal to typst/packages.
+          if ! gh repo view "$PACKAGES_FORK" >/dev/null 2>&1; then
+            gh repo fork typst/packages --clone=false --default-branch-only
+          fi
+          gh repo sync "$PACKAGES_FORK" --source typst/packages --branch main
+
+          # Get only the directory of this package from the fork.
+          git clone --quiet --depth 1 --filter=blob:none --sparse \
+            "https://x-access-token:$GH_TOKEN@github.com/$PACKAGES_FORK.git" "$RUNNER_TEMP/packages"
+          cd "$RUNNER_TEMP/packages"
+          git sparse-checkout set packages/preview/syndicate
+          if [ -d packages/preview/syndicate ]; then kind=update; else kind=new; fi
+
+          # Add the package and push the branch.
+          mkdir -p packages/preview/syndicate
+          cp -r "$GITHUB_WORKSPACE/dist/syndicate/$VERSION" packages/preview/syndicate/
+          login=$(gh api user --jq .login)
+          id=$(gh api user --jq .id)
+          git config user.name "$login"
+          git config user.email "$id+$login@users.noreply.github.com"
+          git switch --quiet --create "$branch"
+          git add packages/preview/syndicate
+          git commit --quiet --message "syndicate:$VERSION"
+          git push --quiet --force origin "$branch"
+
+          # Write the pull request text from the template of typst/packages.
+          body="$RUNNER_TEMP/body.md"
+          if [ "$kind" = new ]; then
+            cat > "$body" <<EOF
+          I am submitting
+          - [x] a new package
+          - [ ] an update for a package
+
+          Description: syndicate encodes Typst values to XML and generates Atom feeds, RSS feeds and sitemaps. Websites and blogs that you make with Typst can use it to publish feeds and sitemaps. It is written in pure Typst. The manual is at $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/manual.pdf.
+
+          I have read and followed the submission guidelines and, in particular, I
+          - [x] selected [a name](https://github.com/typst/packages/blob/main/docs/manifest.md#naming-rules) that isn't the most obvious or canonical name for what the package does
+            - Explanation: Web feeds syndicate the content of a website. The name is a related term, not a descriptive name such as "feed", "rss" or "xml".
+          - [x] added a [\`typst.toml\`](https://github.com/typst/packages/blob/main/docs/manifest.md#package-metadata) file with all required keys
+          - [x] added a [\`README.md\`](https://github.com/typst/packages/blob/main/docs/documentation.md) with documentation for my package
+          - [x] have chosen [a license](https://github.com/typst/packages/blob/main/docs/licensing.md) and added a \`LICENSE\` file or linked one in my \`README.md\`
+          - [x] tested my package locally on my system and it worked
+          - [x] [\`exclude\`d](https://github.com/typst/packages/blob/main/docs/tips.md#what-to-commit-what-to-exclude) PDFs or README images, if any, but not the LICENSE
+          EOF
+          else
+            {
+              printf 'I am submitting\n- [ ] a new package\n- [x] an update for a package\n\nDescription:\n\n'
+              cat "$RUNNER_TEMP/notes.md"
+            } > "$body"
+          fi
+
+          existing=$(gh pr list --repo typst/packages --head "$branch" --state open --json url --jq '.[0].url // empty')
+          if [ -n "$existing" ]; then
+            echo "The pull request exists: $existing"
+          else
+            gh pr create --repo typst/packages --base main --head "${PACKAGES_FORK%%/*}:$branch" \
+              --title "syndicate:$VERSION" --body-file "$body"
+          fi

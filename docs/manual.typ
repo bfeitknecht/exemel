@@ -1,4 +1,4 @@
-// The syndicate manual. Build it with `just manual`.
+// The syndicate manual. To compile it, run `just manual`.
 
 #import "@preview/tidy:0.4.3"
 #import "/lib.typ": atom, rfc2822, rfc3339, rss, sitemap, xml
@@ -7,7 +7,7 @@
 #let accent = rgb("#d9480f")
 #let scope = (xml: xml, atom: atom, rss: rss, sitemap: sitemap, rfc3339: rfc3339, rfc2822: rfc2822)
 
-// Document setup
+// Document settings
 
 #set document(title: "The syndicate manual", author: package.authors.map(a => a
   .split(" <")
@@ -41,9 +41,9 @@
   stroke: 0.5pt + luma(220),
 )
 
-// Example rendering, shared by the guide and the reference. Code is
-// evaluated in code mode: strings are shown as XML, other values as their
-// Typst representation.
+// Shows examples in the guide and in the reference. Typst evaluates the code
+// in code mode. The manual shows strings as XML. It shows other values in their
+// Typst form.
 
 #let show-value(value) = {
   if type(value) == str {
@@ -90,9 +90,9 @@
   ]
   v(1fr)
   text(size: 10pt, fill: luma(90))[
-    syndicate encodes Typst values to XML and generates Atom 1.0 feeds, RSS 2.0 feeds and
-    XML sitemaps for websites and blogs built with Typst. It is written in pure Typst, with
-    no plugins. Licensed under the MIT License.
+    syndicate encodes Typst values to XML. It generates Atom 1.0 feeds, RSS 2.0 feeds and
+    XML sitemaps for websites and blogs that you make with Typst. It is written in pure Typst
+    and does not use plugins. The license is the MIT License.
   ]
 })
 
@@ -100,11 +100,11 @@
 
 = Introduction
 
-Typst can export HTML, which makes it a capable static site generator. A website rarely
-consists of pages alone, though: readers subscribe to *feeds*, and search engines crawl
-*sitemaps*. Both are XML documents, and Typst can read XML but not write it.
+Typst can export HTML. Thus, you can use Typst to make static websites. But a website usually
+has more than pages. Readers subscribe to *feeds*, and search engines read *sitemaps*. Feeds and
+sitemaps are XML documents. Typst can read XML, but it cannot write XML.
 
-syndicate fills that gap with four modules:
+syndicate has four modules that write XML:
 
 #table(
   columns: (auto, 1fr),
@@ -114,14 +114,15 @@ syndicate fills that gap with four modules:
   table.hline(stroke: 0.5pt),
   [*Module*], [*Contents*],
   table.hline(stroke: 0.5pt),
-  [`xml`], [`encode` and `decode` for arbitrary XML, plus node helpers],
+  [`xml`], [`encode` and `decode` for all XML, and functions that make nodes],
   [`atom`], [Atom 1.0 feeds (RFC 4287): `feed`, `entry`, `author`, `tag-uri`],
   [`rss`], [RSS 2.0 feeds: `feed`, `item`, `enclosure`],
-  [`sitemap`], [XML sitemaps: `urlset`, `url`, and sitemap indexes with `index`],
+  [`sitemap`], [XML sitemaps: `urlset` and `url`, and sitemap indexes with `index`],
   table.hline(stroke: 0.5pt),
 )
 
-The date formatters `rfc3339` and `rfc2822` are exported as well. Import what you need:
+The package also exports the date functions `rfc3339` and `rfc2822`. Import the functions that
+you need:
 
 #raw(
   "#import \"@preview/syndicate:" + package.version + "\": xml, atom, rss, sitemap",
@@ -129,15 +130,15 @@ The date formatters `rfc3339` and `rfc2822` are exported as well. Import what yo
   block: true,
 )
 
-Every document function returns the finished XML as a string. Importing `xml` shadows
-Typst's built-in `xml()` reader in your file; use `xml.decode`, which wraps the reader, or
-`std.xml`.
+Each document function returns the complete XML as a string. When you import `xml`, it hides
+the `xml()` reader of Typst in your file. To read XML, use `xml.decode` or `std.xml`.
+`xml.decode` uses the reader of Typst.
 
-= Getting started
+= Start
 
-== One source of truth
+== One data source
 
-Keep the metadata of your posts in one place and map it to every format:
+Keep the data of your posts in one location. Then generate all formats from this data:
 
 ```typ
 #import "@preview/syndicate:0.1.0": atom, rss, sitemap
@@ -183,13 +184,12 @@ Keep the metadata of your posts in one place and map it to every format:
 #let map = sitemap.urlset(site, posts.map(p => sitemap.url(url(p), lastmod: p.date)))
 ```
 
-== Writing the files <writing>
+== Write the files <writing>
 
-By default, a Typst document produces a single output. There are two ways to get the XML
-out.
+Usually, a Typst document makes one output. There are two procedures to get the XML files.
 
-*With bundle export.* Typst 0.15's experimental bundle target writes any number of files,
-next to your HTML pages if you have any:
+*With bundle export.* Bundle export is an experimental output format of Typst 0.15. It writes
+many files. If you have HTML pages, it writes the XML files together with them:
 
 ```typ
 #asset("feed.xml", feed)
@@ -201,8 +201,9 @@ next to your HTML pages if you have any:
 typst compile --features bundle --format bundle blog.typ site/
 ```
 
-*With `typst eval`.* Expose the strings with `metadata` and extract them on the command
-line. In Typst 0.15, `eval` prints JSON, so unwrap the string with `jq`:
+*With `typst eval`.* Put the strings into `metadata`. Then get them with `typst eval` on the
+command line. In Typst 0.15, the output of `eval` is JSON. Thus, use `jq` to get the string from
+the JSON:
 
 ```typ
 #metadata(feed) <feed>
@@ -214,21 +215,22 @@ typst eval --in blog.typ 'query(<feed>).first().value' | jq -j . > feed.xml
 
 == Text, dates and time zones <values>
 
-*Text fields* accept strings, as well as Typst content made of plain markup: text, spaces,
-smart quotes, `*strong*`, `_emph_`, `` `raw` ``, links, underline and the like. Feeds can
-only hold plain text, so markup is stripped, and `[My _first_ post]` becomes
-`My first post`. Content without a faithful plain-text form, such as equations, footnotes
-or images, is an error that names the field. Nothing is dropped silently. When in doubt,
-pass a string.
+*Text fields* accept strings. They also accept Typst content that contains only simple
+markup, for example text, spaces, smart quotes, `*strong*`, `_emph_`, `` `raw` ``, links and
+underline. Feeds can contain only plain text. Thus, the functions remove the markup. For
+example, `[My _first_ post]` changes to `My first post`. Some content has no correct plain-text
+form, for example equations, footnotes and images. For this content, the functions stop with an
+error that shows the field. They do not remove content without a message. If you are not sure,
+use a string.
 
 *Dates* are `datetime` values or ISO 8601 strings without a time zone: `"2026-07-01"`,
-`"2026-07-01T14:30"` or `"2026-07-01T14:30:00"`. Strings are handy for front matter loaded
-from YAML or JSON. Dates without a time get `00:00:00`, except in sitemaps, where they stay
-date-only.
+`"2026-07-01T14:30"` or `"2026-07-01T14:30:00"`. Strings are easy to use with data from YAML
+or JSON files. If a date has no time, the functions use `00:00:00`. In sitemaps, a date
+without a time also has no time in the output.
 
-*Time zones* are set once per document with `tz`: `"Z"` (the default), `"+01:00"` or
-`"-0530"`. Typst's `datetime` has no time zone of its own, so every date in a document is
-interpreted in `tz`.
+*Time zones* apply to a full document. Set them with `tz`, for example `"Z"` (the default),
+`"+01:00"` or `"-0530"`. A `datetime` of Typst has no time zone. Thus, the functions use `tz`
+for all dates in a document.
 
 #example(```
 rfc3339("2026-07-01", tz: "+02:00")
@@ -236,11 +238,11 @@ rfc3339("2026-07-01", tz: "+02:00")
 
 = XML
 
-== Encoding
+== Encode XML
 
-`xml.encode` serializes a tree of nodes. Elements are dictionaries with a `tag` and
-optional `attrs` and `children`, the same shape Typst's `xml()` reader produces. Text is a
-string, a number or simple content, and is escaped automatically.
+`xml.encode` serializes a tree of nodes. An element is a dictionary with a `tag` and optional
+`attrs` and `children`. The `xml()` reader of Typst returns the same structure. Text is a
+string, a number or simple content. `xml.encode` escapes text automatically.
 
 #example(```
 xml.encode(
@@ -262,25 +264,25 @@ xml.encode(
 )
 ```)
 
-- *Attributes* keep their order. `none` omits an attribute; numbers and booleans are
-  converted to text.
-- *Children* may contain `none`, which is skipped, and nested arrays, which are flattened,
-  so `if` expressions and `.map(..)` can be used inline.
-- *`pretty`* only indents elements that contain nothing but other elements. Whitespace is
-  never added next to text, so text content is preserved exactly.
-- *Namespace prefixes* are part of the name: `(tag: "atom:link")`. The `namespace` key holds
-  a namespace URI, see @decoding.
-- *Invalid input is an error:* invalid names, characters XML doesn't allow, `--` in
-  comments, several root elements, misspelled keys.
+- *Attributes* keep their order. `xml.encode` does not write attributes that are `none`. It
+  converts numbers and booleans to text.
+- *Children* can contain `none` and nested arrays. `xml.encode` ignores `none` and flattens
+  the arrays. Thus, you can use `if` expressions and `.map(..)` in the list of children.
+- *`pretty`* indents only elements that contain only elements. `xml.encode` does not add
+  whitespace adjacent to text. Thus, text does not change.
+- *Namespace prefixes* are part of the name, for example `(tag: "atom:link")`. The key
+  `namespace` contains a namespace URI. Refer to @decoding.
+- *Incorrect input causes an error.* Examples are incorrect names, characters that XML
+  prohibits, `--` in comments, more than one root element and keys with spelling errors.
 
-Use `xml.comment`, `xml.cdata` and `xml.pi` for the other node types, and `xml.raw` to
-insert pre-serialized markup verbatim.
+For the other node types, use `xml.comment`, `xml.cdata` and `xml.pi`. To add markup that is
+already serialized, use `xml.raw`. `xml.encode` writes this markup without changes.
 
-== Decoding <decoding>
+== Decode XML <decoding>
 
-`xml.decode` parses XML into the same structure, using Typst's built-in reader. It accepts
-a string, bytes, or a `path(..)` to a file. Use `path` rather than a plain file name, so the
-file is found relative to your document rather than to this package.
+`xml.decode` parses XML into the same structure. It uses the XML reader of Typst. It accepts
+a string, bytes or a `path(..)` to a file. For a file, use `path`, not only the file name. Then
+Typst finds the file relative to your document, not relative to this package.
 
 #example(```
 let doc = xml.decode("<list><item>a</item><item>b</item></list>").first()
@@ -291,8 +293,8 @@ xml.encode(
 )
 ```)
 
-Decoded elements carry a `namespace` key with their namespace URI, which `xml.encode` turns
-back into `xmlns` declarations, so namespaced documents round-trip:
+A decoded element has the key `namespace` with its namespace URI. `xml.encode` changes the URI
+back to `xmlns` declarations. Thus, the encoded document keeps the namespaces:
 
 #example(```
 xml.encode(
@@ -301,18 +303,19 @@ xml.encode(
 )
 ```)
 
-Decoding inherits two limitations of the built-in reader:
+`xml.decode` has two limits, because the reader of Typst has them:
 
-- Comments and processing instructions are dropped. The reader leaves empty placeholder
-  elements in their place, which `xml.decode` removes; `xml.encode` rejects them in plain
-  `std.xml` output.
-- Prefixes are lost: `<media:thumbnail>` comes back as `thumbnail` with the media namespace
-  URI, and `xml:lang` comes back as `lang`.
+- The reader removes comments and processing instructions. It puts empty placeholder elements
+  in their positions. `xml.decode` removes these placeholders. If the output of `std.xml`
+  contains placeholders, `xml.encode` stops with an error.
+- The reader removes prefixes. For example, `<media:thumbnail>` changes to `thumbnail` with the
+  media namespace URI, and `xml:lang` changes to `lang`.
 
 = Feeds
 
-Atom and RSS are both widely supported by feed readers. Atom is the better specified of the
-two; RSS is older and more common in podcasting. Offering both costs one more call.
+Almost all feed readers can read Atom and RSS. The specification of Atom is more precise. RSS
+is older, and podcasts use it more frequently. To publish both formats, you need only one more
+function call.
 
 == Atom
 
@@ -337,10 +340,11 @@ atom.feed(
 )
 ```)
 
-Every feed and entry needs a permanent, unique `id`. It defaults to the `link`, which
-changes when you move your site; `atom.tag-uri` builds identifiers that don't. Every entry
-needs an author, set on the feed or on each entry. A string `content` is HTML source,
-escaped as Atom requires; Typst content is converted to plain text.
+Each feed and each entry must have a permanent, unique `id`. The default is the `link`. But
+the link changes when you move your website. `atom.tag-uri` makes identifiers that do not
+change. Each entry must have an author. Set the authors in the feed or in each entry. If
+`content` is a string, it is HTML source. The function escapes it as Atom specifies. The
+function converts Typst content to plain text.
 
 == RSS
 
@@ -365,14 +369,14 @@ rss.feed(
 )
 ```)
 
-RSS's `<author>` requires an email address, so authors given only by name are written as
-`<dc:creator>`. The `atom`, `content` and `dc` namespaces are declared automatically when
-they're used.
+In RSS, `<author>` must contain an email address. If an author has only a name, `rss.item`
+writes the name as `<dc:creator>`. If the feed uses the `atom`, `content` or `dc` namespace,
+`rss.feed` declares it automatically.
 
 = Sitemaps
 
-A sitemap lists the pages of a website for search engines. Pages are `sitemap.url(..)`
-entries or plain URL strings, passed as arguments or arrays.
+A sitemap lists the pages of a website for search engines. The pages are `sitemap.url(..)`
+entries or URL strings. Give them as arguments or arrays.
 
 #example(```
 sitemap.urlset(
@@ -386,21 +390,21 @@ sitemap.urlset(
 )
 ```)
 
-A sitemap holds at most 50 000 URLs. Split larger sites and list the parts with
-`sitemap.index`.
+A sitemap can contain a maximum of 50 000 URLs. For a larger website, divide the list into more
+than one sitemap. Then list the sitemaps with `sitemap.index`.
 
-= Extending documents
+= Extend documents
 
-Every document function accepts `tz`, `stylesheet` and `pretty`:
+All document functions accept `tz`, `stylesheet` and `pretty`:
 
-- *`stylesheet`* adds an `<?xml-stylesheet?>` instruction, so browsers show a styled page
-  instead of raw XML. Both XSL and CSS are supported.
-- *`pretty`* indents the output and is on by default.
+- *`stylesheet`* adds an `<?xml-stylesheet?>` instruction. Then browsers show a page with
+  styles, not the XML source. You can use XSL or CSS.
+- *`pretty`* indents the output. The default is `true`.
 
-`atom.feed`, `rss.feed` and `sitemap.urlset` also accept `namespaces`, extra
-`(prefix: uri)` declarations on the root element. The feeds and their entries, as well as
-`sitemap.url`, accept `extra`: XML nodes appended to the element. Together, they support
-extensions such as Media RSS:
+`atom.feed`, `rss.feed` and `sitemap.urlset` also accept `namespaces`. These are more
+`(prefix: uri)` declarations on the root element. The feeds, their entries and `sitemap.url`
+accept `extra`. These are XML nodes that the function adds at the end of the element. With
+these two options, you can use extensions, for example Media RSS:
 
 #example(```
 rss.feed(

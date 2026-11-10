@@ -1,4 +1,4 @@
-// Atom 1.0 feeds (RFC 4287).
+// Functions that generate Atom 1.0 feeds (RFC 4287).
 
 #import "util.typ" as _util
 #import "xml.typ" as _xml
@@ -6,8 +6,8 @@
 #let _ns = "http://www.w3.org/2005/Atom"
 #let _content-type = content
 
-/// Builds a `tag:` URI (RFC 4151): a permanent, unique identifier for a feed
-/// or entry that survives changes to your URLs.
+/// Makes a `tag:` URI (RFC 4151). Use it as a permanent, unique identifier for a
+/// feed or an entry. The identifier does not change when your URLs change.
 ///
 /// ```examplec
 /// atom.tag-uri("example.com", "2026-07-01", "blog/hello-world")
@@ -15,12 +15,12 @@
 ///
 /// -> str
 #let tag-uri(
-  /// A domain name or email address you controlled on `date`. -> str
+  /// A domain name or an email address that you controlled on `date`. -> str
   authority,
-  /// A date on which you controlled `authority`, typically when the feed or
-  /// entry was created. -> datetime | str
+  /// A date on which you controlled `authority`. Usually, this is the date
+  /// when you made the feed or the entry. -> datetime | str
   date,
-  /// Anything that is unique for this authority and date. -> str
+  /// A text that is unique for this authority and date. -> str
   specific,
 ) = {
   let authority = _util.to-text(authority, field: "authority").trim()
@@ -29,13 +29,13 @@
   "tag:" + authority + "," + date + ":" + _util.to-text(specific, field: "specific")
 }
 
-/// Describes a person, for the `authors` and `contributors` of feeds and
-/// entries. Wherever a person is expected, a plain string is accepted as
-/// well and used as the name.
+/// Describes a person for the `authors` and `contributors` of feeds and
+/// entries. Where a function expects a person, you can also use a string. The
+/// function uses the string as the name.
 ///
 /// -> dictionary
 #let author(
-  /// The person's name. -> str | content
+  /// The name of the person. -> str | content
   name,
   /// An email address. -> str | none
   email: none,
@@ -84,7 +84,8 @@
   )
 }
 
-// A text construct like <title> or <content>; `type="text"` is the default and omitted.
+// Makes a text construct, for example <title> or <content>. The function does not write
+// `type="text"`, because it is the default.
 #let _text(tag, value, kind: "text") = if value != none {
   (
     tag: tag,
@@ -93,7 +94,7 @@
   )
 }
 
-/// Describes an entry, for `atom.feed(entries: ..)`.
+/// Describes an entry for `atom.feed(entries: ..)`.
 ///
 /// ```typc
 /// atom.entry(
@@ -108,32 +109,33 @@
 #let entry(
   /// The title. -> str | content
   title,
-  /// A permanent, unique identifier. Defaults to `link`; consider
-  /// `atom.tag-uri` for identifiers that survive URL changes. -> str | auto
+  /// A permanent, unique identifier. The default is `link`. If your URLs can
+  /// change, use `atom.tag-uri`. -> str | auto
   id: auto,
-  /// The URL of the entry's web page. Required unless `content` is given. -> str | none
+  /// The URL of the web page of the entry. It is necessary if there is no `content`. -> str | none
   link: none,
-  /// When the entry last changed significantly. Defaults to `published`. -> datetime | str | auto
+  /// The date of the last important change. The default is `published`. -> datetime | str | auto
   updated: auto,
-  /// When the entry was first published. -> datetime | str | none
+  /// The date of the first publication. -> datetime | str | none
   published: none,
-  /// A short plain-text summary. -> str | content | none
+  /// A short summary in plain text. -> str | content | none
   summary: none,
-  /// The full content. A string is HTML source, escaped as Atom requires;
-  /// content is converted to plain text. -> str | content | none
+  /// The full content. A string is HTML source. The function escapes it as
+  /// Atom specifies. The function converts content to plain text.
+  /// -> str | content | none
   content: none,
-  /// The content's `type`: `"html"`, `"text"` or a MIME type. By default
-  /// `"html"` for strings and `"text"` for content. -> str | auto
+  /// The `type` of the content: `"html"`, `"text"` or a MIME type. The default
+  /// is `"html"` for strings and `"text"` for content. -> str | auto
   content-type: auto,
-  /// The authors: strings or `atom.author(..)`. -> array
+  /// The authors, as strings or `atom.author(..)`. -> array
   authors: (),
-  /// The contributors: strings or `atom.author(..)`. -> array
+  /// The contributors, as strings or `atom.author(..)`. -> array
   contributors: (),
-  /// The categories: strings, or dictionaries `(term: .., scheme: .., label: ..)`. -> array
+  /// The categories, as strings or dictionaries `(term: .., scheme: .., label: ..)`. -> array
   categories: (),
-  /// A copyright notice. -> str | content | none
+  /// A copyright statement. -> str | content | none
   rights: none,
-  /// Additional XML nodes appended to the entry. -> array
+  /// More XML nodes. The function adds them at the end of the entry. -> array
   extra: (),
 ) = {
   let title = _util.to-text(title, field: "title")
@@ -209,46 +211,50 @@
 ///
 /// -> str
 #let feed(
-  /// The feed's title. Required. -> str | content
+  /// The title of the feed. This value is necessary. -> str | content
   title: none,
-  /// A subtitle or description. -> str | content | none
+  /// A subtitle or a description. -> str | content | none
   subtitle: none,
-  /// The URL of the website. Required. -> str
+  /// The URL of the website. This value is necessary. -> str
   link: none,
-  /// The URL where this feed is published. Recommended. -> str | none
+  /// The URL of this feed. Set it if possible. -> str | none
   self-link: none,
-  /// A permanent, unique identifier. Defaults to `link`. -> str | auto
+  /// A permanent, unique identifier. The default is `link`. -> str | auto
   id: auto,
-  /// When the feed last changed. Defaults to the latest `updated` of the entries. -> datetime | str | auto
+  /// The date of the last change. The default is the latest `updated` of the entries.
+  /// -> datetime | str | auto
   updated: auto,
-  /// The authors: strings or `atom.author(..)`. Required unless every entry has its own. -> array | str
+  /// The authors, as strings or `atom.author(..)`. This value is necessary if an entry
+  /// has no authors. -> array | str
   authors: (),
-  /// The contributors: strings or `atom.author(..)`. -> array
+  /// The contributors, as strings or `atom.author(..)`. -> array
   contributors: (),
-  /// The categories: strings, or dictionaries `(term: .., scheme: .., label: ..)`. -> array
+  /// The categories, as strings or dictionaries `(term: .., scheme: .., label: ..)`. -> array
   categories: (),
-  /// A copyright notice. -> str | content | none
+  /// A copyright statement. -> str | content | none
   rights: none,
-  /// The URL of a small icon (square, like a favicon). -> str | none
+  /// The URL of a small, square icon, for example a favicon. -> str | none
   icon: none,
-  /// The URL of a larger logo (2:1 aspect ratio). -> str | none
+  /// The URL of a larger logo with an aspect ratio of 2:1. -> str | none
   logo: none,
-  /// The software that generated the feed: a name, or a dictionary
+  /// The software that generated the feed. Use a name or a dictionary
   /// `(name: .., uri: .., version: ..)`. -> str | dictionary | none
   generator: none,
-  /// The language of the feed, e.g. `"en"`, written as `xml:lang`. -> str | none
+  /// The language of the feed, for example `"en"`. The function writes it as `xml:lang`.
+  /// -> str | none
   language: none,
-  /// The entries, created with `atom.entry(..)`. -> array
+  /// The entries. Make them with `atom.entry(..)`. -> array
   entries: (),
-  /// The time zone of all dates: `"Z"` for UTC, or an offset like `"+01:00"`. -> str
+  /// The time zone of all dates. Use `"Z"` for UTC, or an offset, for example `"+01:00"`.
+  /// -> str
   tz: "Z",
-  /// The URL of an XSL or CSS stylesheet that browsers apply to the feed. -> str | none
+  /// The URL of an XSL or CSS stylesheet. Browsers apply it to the feed. -> str | none
   stylesheet: none,
-  /// Additional namespace declarations `(prefix: uri)`, for elements in `extra`. -> dictionary
+  /// More namespace declarations `(prefix: uri)` for the elements in `extra`. -> dictionary
   namespaces: (:),
-  /// Additional XML nodes appended to the feed. -> array
+  /// More XML nodes. The function adds them at the end of the feed. -> array
   extra: (),
-  /// Whether to indent the output. -> bool
+  /// If `true`, the function indents the output. -> bool
   pretty: true,
 ) = {
   if title == none { panic("`title` is required") }

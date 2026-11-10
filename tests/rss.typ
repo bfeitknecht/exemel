@@ -27,7 +27,8 @@
 #metadata(out) <out>
 #if "update" not in sys.inputs { assert.eq(out, read("ref/rss.xml")) }
 
-// Minimal feed: no dates means no <lastBuildDate>, no self link means no atom namespace.
+// A minimal feed. Without dates, there is no <lastBuildDate>. Without `self-link`, there is no
+// atom namespace.
 #let minimal = rss.feed(
   title: "Minimal",
   link: "https://example.org",
@@ -40,7 +41,7 @@
   "<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss version=\"2.0\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\"><channel><title>Minimal</title><link>https://example.org</link><description>Nothing here</description><item><description>Untitled</description><dc:creator>Someone</dc:creator><guid isPermaLink=\"false\">urn:x:1</guid></item></channel></rss>",
 )
 
-// Podcast enclosure, explicit guid/permalink and `updated: none`
+// A podcast enclosure, a `guid` and `permalink` that are set, and `updated: none`
 #let pod = rss.feed(
   title: "Pod",
   link: "https://pod.example",

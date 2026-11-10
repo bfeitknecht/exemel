@@ -37,7 +37,12 @@
 #let minimal = atom.feed(
   title: "Minimal",
   link: "https://example.org",
-  entries: atom.entry("Only", link: "https://example.org/only", published: "2026-02-03", authors: "Someone"),
+  entries: atom.entry(
+    "Only",
+    link: "https://example.org/only",
+    published: "2026-02-03",
+    authors: "Someone",
+  ),
   pretty: false,
 )
 #assert.eq(

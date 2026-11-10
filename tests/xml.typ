@@ -25,7 +25,11 @@
 #assert.eq(enc((tag: "p", children: "single")), "<p>single</p>")
 
 // Constructors
-#assert.eq(xml.element("a", attrs: (href: "/"), "home"), (tag: "a", attrs: (href: "/"), children: ("home",)))
+#assert.eq(xml.element("a", attrs: (href: "/"), "home"), (
+  tag: "a",
+  attrs: (href: "/"),
+  children: ("home",),
+))
 #assert.eq(enc(xml.element("p", "x ", xml.element("em", "y"))), "<p>x <em>y</em></p>")
 #assert.eq(enc(xml.element("s", xml.cdata("a]]>b"))), "<s><![CDATA[a]]]]><![CDATA[>b]]></s>")
 #assert.eq(enc(xml.element("s", xml.comment(" note "))), "<s><!-- note --></s>")
@@ -36,11 +40,17 @@
 #assert.eq(enc((tag: "atom:link", attrs: ("xml:lang": "en"))), "<atom:link xml:lang=\"en\"/>")
 
 // Content is converted to plain text
-#assert.eq(enc((tag: "t", children: ([Hello *world* -- "quoted"],))), "<t>Hello world – \"quoted\"</t>")
+#assert.eq(
+  enc((tag: "t", children: ([Hello *world* -- "quoted"],))),
+  "<t>Hello world – \"quoted\"</t>",
+)
 
 // Declaration
 #assert.eq(xml.encode((tag: "r")), "<?xml version=\"1.0\" encoding=\"UTF-8\"?><r/>")
-#assert.eq(xml.encode((tag: "r"), declaration: "<?xml version=\"1.1\"?>"), "<?xml version=\"1.1\"?><r/>")
+#assert.eq(
+  xml.encode((tag: "r"), declaration: "<?xml version=\"1.1\"?>"),
+  "<?xml version=\"1.1\"?><r/>",
+)
 
 // Pretty printing indents element-only content and leaves text content alone
 #assert.eq(
@@ -63,7 +73,10 @@
 
 // Top-level comments and processing instructions
 #assert.eq(
-  xml.encode((xml.pi("xml-stylesheet", "href=\"s.xsl\""), xml.comment(" c "), (tag: "r")), pretty: true),
+  xml.encode(
+    (xml.pi("xml-stylesheet", "href=\"s.xsl\""), xml.comment(" c "), (tag: "r")),
+    pretty: true,
+  ),
   "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<?xml-stylesheet href=\"s.xsl\"?>\n<!-- c -->\n<r/>\n",
 )
 
@@ -92,7 +105,14 @@
 // Comments and processing instructions are removed (the reader turns them into empty-tag elements)
 #assert.eq(
   xml.decode("<?xml version=\"1.0\"?><!-- top --><r><!-- c --><a/><?pi x?></r>"),
-  ((namespace: none, tag: "r", attrs: (:), children: ((namespace: none, tag: "a", attrs: (:), children: ()),)),),
+  (
+    (
+      namespace: none,
+      tag: "r",
+      attrs: (:),
+      children: ((namespace: none, tag: "a", attrs: (:), children: ()),),
+    ),
+  ),
 )
 
 // Files are read relative to the calling document via `path`; whitespace is preserved

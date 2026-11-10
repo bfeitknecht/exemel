@@ -27,4 +27,4 @@ First release as **syndicate**, forked from [exemel](https://github.com/wensimeh
 - Text fields accept simple Typst content, converted strictly to plain text: unsupported elements are an error instead of being dropped.
 - `stylesheet`, `namespaces` and `extra` options for extending documents.
 - Atom `contributors`, `rights`, `icon`, `logo`, `generator`, `language` and structured categories.
-- Test suite (`just test`) and CI on Typst 0.15.0 and latest. Reference files are generated with bundle export.
+- A manual with a guide and a full reference, generated from the doc comments: [docs/manual.pdf](docs/manual.pdf).

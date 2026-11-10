@@ -1,5 +1,5 @@
-#import "/lib.typ": rfc3339, rfc2822, atom
-#import "/src/util.typ": to-text, to-datetime
+#import "/lib.typ": atom, rfc2822, rfc3339
+#import "/src/util.typ": to-datetime, to-text
 
 // Dates
 #let d = datetime(year: 2026, month: 7, day: 1)
@@ -14,7 +14,14 @@
 
 #assert.eq(to-datetime("2026-07-01"), d)
 #assert.eq(to-datetime("2026-07-03T14:30:05"), dt)
-#assert.eq(to-datetime("2026-07-03 14:30"), datetime(year: 2026, month: 7, day: 3, hour: 14, minute: 30, second: 0))
+#assert.eq(to-datetime("2026-07-03 14:30"), datetime(
+  year: 2026,
+  month: 7,
+  day: 3,
+  hour: 14,
+  minute: 30,
+  second: 0,
+))
 
 // tag: URIs
 #assert.eq(atom.tag-uri("example.com", d, "blog/post"), "tag:example.com,2026-07-01:blog/post")
@@ -26,7 +33,16 @@
 #assert.eq(to-text(sym.arrow.r), "→")
 #assert.eq(to-text([Hello *bold* _emph_ `raw`]), "Hello bold emph raw")
 #assert.eq(to-text([It's "quoted" -- really...]), "It's \"quoted\" – really…")
-#assert.eq(to-text([#link("https://typst.app")[Typst] and #link("https://x.org")]), "Typst and https://x.org")
+#assert.eq(
+  to-text([#link("https://typst.app")[Typst] and #link("https://x.org")]),
+  "Typst and https://x.org",
+)
 #assert.eq(to-text([#underline[u] #strike[s] #highlight[h] #smallcaps[c] H#sub[2]O]), "u s h c H2O")
 #assert.eq(to-text([a \ b]), "a \n b")
-#assert.eq(to-text({ set text(red); [styled] }), "styled")
+#assert.eq(
+  to-text({
+    set text(red)
+    [styled]
+  }),
+  "styled",
+)

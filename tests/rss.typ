@@ -1,4 +1,4 @@
-#import "/lib.typ": rss, atom
+#import "/lib.typ": atom, rss
 #import "posts.typ": *
 
 #let out = rss.feed(
@@ -56,6 +56,10 @@
   ),
   pretty: false,
 )
-#assert(pod.contains("<enclosure url=\"https://pod.example/1.mp3\" length=\"1234567\" type=\"audio/mpeg\"/>"))
+#assert(
+  pod.contains(
+    "<enclosure url=\"https://pod.example/1.mp3\" length=\"1234567\" type=\"audio/mpeg\"/>",
+  ),
+)
 #assert(pod.contains("<guid isPermaLink=\"false\">https://pod.example/1</guid>"))
 #assert(not pod.contains("lastBuildDate"))

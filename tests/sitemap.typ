@@ -9,7 +9,9 @@
     priority: 0.25,
     alternates: (de: site + "de/about/", "x-default": site + "about/"),
   ),
-  posts.map(p => sitemap.url(post-url(p), lastmod: if p.updated == auto { p.published } else { p.updated })),
+  posts.map(p => sitemap.url(post-url(p), lastmod: if p.updated == auto { p.published } else {
+    p.updated
+  })),
   site + "imprint/",
   tz: "+01:00",
 )

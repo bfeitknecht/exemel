@@ -1,12 +1,13 @@
-// XML serialization.
+// XML encoding and decoding.
 //
-// syndicate is a fork of exemel by Jeremy Gao (https://github.com/wensimehrp/exemel),
-// licensed under Apache-2.0. This file replaces the original Rust/WASM serializer.
+// Part of syndicate, a fork of exemel by Jeremy Gao.
+// Licensed under the Apache License 2.0; see LICENSE and NOTICE.
 
 #import "util.typ" as _util
 
 #let _name-re = regex("^[\p{L}_:][\p{L}\p{N}_:.\-\x{B7}]*$")
 #let _invalid-re = regex("[\x00-\x08\x0B\x0C\x0E-\x1F\x{FFFE}\x{FFFF}]")
+#let _element-keys = ("tag", "attrs", "children", "namespace")
 
 #let _check-chars(s, what) = {
   if s.contains(_invalid-re) {
@@ -22,42 +23,126 @@
   name
 }
 
-/// Escape a string for use as XML character data.
-#let escape(s) = {
-  _check-chars(_util.to-text(s, field: "text"), "text").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+/// Escapes text for use as XML character data: `&`, `<` and `>` become
+/// entity references.
+///
+/// ```examplec
+/// xml.escape("Fish & <Chips>")
+/// ```
+///
+/// -> str
+#let escape(
+  /// The text. -> str | content
+  text,
+) = {
+  _check-chars(_util.to-text(text, field: "text"), "text")
+    .replace("&", "&amp;")
+    .replace("<", "&lt;")
+    .replace(">", "&gt;")
 }
 
 #let _escape-attr(s) = {
-  escape(s).replace("\"", "&quot;").replace("\t", "&#9;").replace("\n", "&#10;").replace("\r", "&#13;")
+  escape(s)
+    .replace("\"", "&quot;")
+    .replace("\t", "&#9;")
+    .replace("\n", "&#10;")
+    .replace("\r", "&#13;")
 }
 
-/// Build an element node: `xml.element("a", attrs: (href: "/"), "link text")`.
-/// Equivalent to the dictionary `(tag: "a", attrs: (href: "/"), children: ("link text",))`.
-#let element(tag, attrs: (:), ..children) = {
+/// Builds an element node. Equivalent to writing the dictionary
+/// `(tag: tag, attrs: attrs, children: children)` yourself.
+///
+/// ```examplec
+/// xml.element("a", attrs: (href: "/"), "Home")
+/// ```
+///
+/// -> dictionary
+#let element(
+  /// The element name, optionally with a namespace prefix like `"atom:link"`. -> str
+  tag,
+  /// The attributes. Attributes set to `none` are omitted. -> dictionary
+  attrs: (:),
+  /// The child nodes. -> str | content | dictionary | array | none
+  ..children,
+) = {
   if children.named().len() > 0 {
-    panic("unexpected named arguments " + repr(children.named().keys()) + "; put attributes into `attrs`")
+    panic(
+      "unexpected named arguments "
+        + repr(children.named().keys())
+        + "; put attributes into `attrs`",
+    )
   }
   (tag: tag, attrs: attrs, children: children.pos())
 }
 
-/// A comment node: `<!-- body -->`.
-#let comment(body) = (comment: body)
+/// A comment node, written as `<!--body-->`.
+///
+/// ```examplec
+/// xml.encode(
+///   (tag: "p", children: (xml.comment(" draft "),)),
+///   declaration: false,
+/// )
+/// ```
+///
+/// -> dictionary
+#let comment(
+  /// The comment text. It must not contain `--` or end with `-`. -> str
+  body,
+) = (comment: body)
 
-/// A CDATA section: `<![CDATA[body]]>`.
-#let cdata(body) = (cdata: body)
+/// A CDATA section, written as `<![CDATA[body]]>`. Occurrences of `]]>` are
+/// split across two sections, so any text is safe.
+///
+/// ```examplec
+/// xml.encode(
+///   (tag: "script", children: (xml.cdata("if (a < b) go()"),)),
+///   declaration: false,
+/// )
+/// ```
+///
+/// -> dictionary
+#let cdata(
+  /// The text. -> str
+  body,
+) = (cdata: body)
 
-/// A processing instruction: `<?target data?>`.
-#let pi(target, data) = (pi: target, data: data)
+/// A processing instruction, written as `<?target data?>`.
+///
+/// ```examplec
+/// xml.encode(
+///   (xml.pi("xml-stylesheet", "href=\"style.xsl\""), (tag: "doc")),
+///   declaration: false,
+/// )
+/// ```
+///
+/// -> dictionary
+#let pi(
+  /// The target, e.g. `"xml-stylesheet"`. -> str
+  target,
+  /// The instruction's data. It must not contain `?>`. -> str | none
+  data,
+) = (pi: target, data: data)
 
-/// Pre-serialized markup that is written verbatim. You are responsible for
-/// it being well-formed.
-#let raw(body) = (raw: body)
+/// Pre-serialized markup, written verbatim. You are responsible for it being
+/// well-formed.
+///
+/// ```examplec
+/// xml.encode(
+///   (tag: "p", children: (xml.raw("<b>bold</b> &amp; raw"),)),
+///   declaration: false,
+/// )
+/// ```
+///
+/// -> dictionary
+#let raw(
+  /// The markup. -> str
+  body,
+) = (raw: body)
 
-#let _element-keys = ("tag", "attrs", "children", "namespace")
-
+// The kind of a node: "text", "element", "comment", "cdata", "pi" or "raw".
 #let _kind(node) = {
   let t = type(node)
-  if t == str or t == content or t == int or t == float or t == decimal or t == symbol {
+  if t in (str, content, int, float, decimal, symbol) {
     return "text"
   }
   if t != dictionary {
@@ -65,27 +150,31 @@
   }
   if "tag" in node {
     if node.tag == "" {
-      panic("element with an empty tag; Typst's `xml()` reader produces these for comments and processing instructions, read files with `xml.decode` instead, which removes them")
+      panic(
+        "element with an empty tag; Typst's `xml()` reader produces these for comments and "
+          + "processing instructions, read files with `xml.decode` instead, which removes them",
+      )
     }
-    for k in node.keys() {
-      if k not in _element-keys {
-        panic("unknown key `" + k + "` in element `" + str(node.tag) + "`; allowed are " + _element-keys.map(k => "`" + k + "`").join(", "))
+    for key in node.keys() {
+      if key not in _element-keys {
+        panic(
+          "unknown key `"
+            + key
+            + "` in element `"
+            + str(node.tag)
+            + "`; allowed are "
+            + _element-keys.map(k => "`" + k + "`").join(", "),
+        )
       }
     }
     return "element"
   }
-  for k in ("comment", "cdata", "pi", "raw") {
-    if k in node { return k }
+  for kind in ("comment", "cdata", "pi", "raw") {
+    if kind in node { return kind }
   }
   panic("not an XML node: " + repr(node) + " (dictionaries need a `tag` key)")
 }
 
-#let _attr-value(v, name) = {
-  let t = type(v)
-  if t == bool { if v { "true" } else { "false" } } else { _util.to-text(v, field: "attribute `" + name + "`") }
-}
-
-// Serialize a non-element node.
 #let _render-leaf(node, kind) = {
   if kind == "text" {
     return escape(_util.to-text(node, field: "text node"))
@@ -104,28 +193,28 @@
     }
     return "<!--" + body + "-->"
   }
-  // processing instruction
+  // Processing instruction
   let target = _check-name(node.pi, "processing instruction target")
   if lower(target) == "xml" {
     panic("use the `declaration` parameter of `xml.encode` for the XML declaration")
   }
-  let data = node.at("data", default: none)
-  let data = if data == none { "" } else { _check-chars(_util.to-text(data, field: "processing instruction"), "processing instruction") }
+  let data = _util.opt-text(node.at("data", default: none), field: "processing instruction")
+  let data = if data == none { "" } else { _check-chars(data, "processing instruction") }
   if data.contains("?>") {
     panic("processing instructions must not contain `?>`: " + repr(data))
   }
-  let data = if data == "" { "" } else { " " + data }
-  "<?" + target + data + "?>"
+  "<?" + target + (if data == "" { "" } else { " " + data }) + "?>"
 }
 
-// The start tag (without the closing `>` or `/>`) and the default namespace in scope.
+// Returns the start tag without its closing `>` or `/>`, and the default
+// namespace in scope for the element's children.
 #let _start-tag(node, tag, default-ns) = {
   let attrs = node.at("attrs", default: (:))
   if type(attrs) != dictionary {
     panic("`attrs` of element `" + tag + "` must be a dictionary, found " + str(type(attrs)))
   }
-  // Typst's own `xml()` reader (0.15+) records each element's namespace URI;
-  // re-declare it as default namespace wherever it changes so round-trips are lossless.
+  // Decoded elements carry their namespace URI. Declare it as the default
+  // namespace wherever it changes, so namespaced documents round-trip.
   let ns = default-ns
   let parts = ()
   if "xmlns" in attrs {
@@ -134,20 +223,25 @@
     ns = node.namespace
     parts.push(" xmlns=\"" + _escape-attr(if ns == none { "" } else { ns }) + "\"")
   }
-  for (k, v) in attrs {
-    if v == none { continue }
-    parts.push(" " + _check-name(k, "attribute name") + "=\"" + _escape-attr(_attr-value(v, k)) + "\"")
+  for (name, value) in attrs {
+    if value == none { continue }
+    let value = if type(value) == bool {
+      if value { "true" } else { "false" }
+    } else {
+      _util.to-text(value, field: "attribute `" + name + "`")
+    }
+    parts.push(" " + _check-name(name, "attribute name") + "=\"" + _escape-attr(value) + "\"")
   }
   ("<" + tag + _util.concat(parts), ns)
 }
 
-// Iterative (stack-based) so that deeply nested trees don't hit Typst's call depth limit.
-// The stack holds output strings and `(node, depth, default-ns, pretty)` tasks.
+// Serializes a node. Works with an explicit stack instead of recursion, so
+// deep trees don't hit Typst's call depth limit. The stack holds output
+// strings and `(node, depth, default-ns, pretty)` tasks.
 #let _render(root, pretty, pad) = {
   let out = ()
   let stack = ((root, 0, none, pretty),)
-  // Typst stops `while` loops after 10 000 iterations, so tasks are processed in
-  // batches by a bounded inner `for` loop.
+  // Typst stops `while` loops after 10 000 iterations, so work in batches.
   while stack.len() > 0 {
     for _ in range(4096) {
       if stack.len() == 0 { break }
@@ -170,19 +264,19 @@
         continue
       }
       out.push(open + ">")
-      // Only indent element-only content: inserting whitespace next to text would change it.
+      // Only indent element-only content: whitespace next to text would change it.
       let mixed = children.any(c => _kind(c) in ("text", "cdata", "raw"))
       let tasks = ()
       if pretty and not mixed {
         let indent = "\n" + pad * (depth + 1)
-        for c in children {
+        for child in children {
           tasks.push(indent)
-          tasks.push((c, depth + 1, ns, true))
+          tasks.push((child, depth + 1, ns, true))
         }
         tasks.push("\n" + pad * depth + "</" + tag + ">")
       } else {
-        for c in children {
-          tasks.push((c, depth + 1, ns, false))
+        for child in children {
+          tasks.push((child, depth + 1, ns, false))
         }
         tasks.push("</" + tag + ">")
       }
@@ -192,64 +286,50 @@
   _util.concat(out)
 }
 
-// Typst's `xml()` reader turns comments and processing instructions into
-// elements with an empty tag. Rebuild the tree without them (iteratively, so
-// deep documents don't hit the call depth limit).
-#let _strip-placeholders(nodes) = {
-  let is-placeholder(n) = type(n) == dictionary and n.at("tag", default: none) == ""
-  // Frames: the element being rebuilt (`none` for the top level), its finished
-  // children and its remaining children (reversed, so `pop` yields the next one).
-  let stack = ((node: none, done: (), todo: nodes.rev()),)
-  while true {
-    for _ in range(4096) {
-      if stack.at(-1).todo.len() == 0 {
-        let frame = stack.pop()
-        let finished = if frame.node == none { frame.done } else { frame.node + (children: frame.done) }
-        if stack.len() == 0 { return finished }
-        stack.at(-1).done.push(finished)
-        continue
-      }
-      let child = stack.at(-1).todo.pop()
-      if is-placeholder(child) { continue }
-      if type(child) == dictionary and "children" in child {
-        stack.push((node: child, done: (), todo: child.children.rev()))
-      } else {
-        stack.at(-1).done.push(child)
-      }
-    }
-  }
-}
-
-/// Parse XML into the node structure used by `xml.encode`, using Typst's
-/// built-in `xml()` reader.
+/// Serializes a tree of nodes to an XML document.
 ///
-/// - `source`: the XML as a string or bytes, or a `path(..)` to a file. Use
-///   `path` rather than a plain string for files, so that the file is found
-///   relative to your document instead of this package.
+/// Elements are dictionaries `(tag: .., attrs: .., children: ..)`, where
+/// `attrs` and `children` are optional. Text is given as strings, numbers or
+/// simple content and is escaped automatically. Children set to `none` are
+/// skipped and nested arrays are flattened, so `if` and `.map(..)` can be
+/// used inline.
 ///
-/// Returns an array of top-level nodes. Elements are
-/// `(namespace: .., tag: .., attrs: .., children: ..)`, text is a string.
-/// Comments and processing instructions are dropped, and namespace prefixes
-/// are replaced by the `namespace` URI (a limitation of the reader).
-#let decode(source) = {
-  let data = if type(source) == str { bytes(source) } else { source }
-  _strip-placeholders(std.xml(data))
-}
-
-/// Serialize an XML tree to a string.
+/// ```examplec
+/// xml.encode(
+///   (
+///     tag: "book",
+///     attrs: (id: "bk101", lang: none),
+///     children: (
+///       (tag: "title", children: ("XML & Typst",)),
+///       (tag: "price", children: (44.95,)),
+///     ),
+///   ),
+///   pretty: true,
+/// )
+/// ```
 ///
-/// - `root`: an element, or an array of top-level nodes (comments and
-///   processing instructions around exactly one element).
-/// - `pretty`: indent element-only content. Text content is never altered.
-/// - `indent`: number of spaces (or a string) per level when `pretty` is set.
-/// - `declaration`: `true` for `<?xml version="1.0" encoding="UTF-8"?>`,
-///   `false` for none, or a custom string.
-#let encode(root, pretty: false, indent: 2, declaration: true) = {
-  // Whitespace between top-level nodes (as returned by Typst's `xml()` reader) is insignificant.
+/// -> str
+#let encode(
+  /// The root element, or an array of top-level nodes: exactly one element,
+  /// optionally surrounded by comments and processing instructions.
+  /// -> dictionary | array
+  root,
+  /// Whether to indent elements that contain only other elements. Text
+  /// content is never altered. -> bool
+  pretty: false,
+  /// The indentation per level when `pretty` is set: a number of spaces, or a
+  /// string such as `"\t"`. -> int | str
+  indent: 2,
+  /// `true` for `<?xml version="1.0" encoding="UTF-8"?>`, `false` for no
+  /// declaration, or a custom declaration. -> bool | str
+  declaration: true,
+) = {
+  // Whitespace between top-level nodes (as returned by the reader) is insignificant.
   let nodes = _util.flatten(root).filter(n => not (type(n) == str and n.trim() == ""))
   let kinds = nodes.map(_kind)
-  if kinds.filter(k => k == "element").len() != 1 {
-    panic("an XML document needs exactly one root element, found " + str(kinds.filter(k => k == "element").len()))
+  let elements = kinds.filter(k => k == "element").len()
+  if elements != 1 {
+    panic("an XML document needs exactly one root element, found " + str(elements))
   }
   if kinds.any(k => k not in ("element", "comment", "pi")) {
     panic("only comments and processing instructions may appear next to the root element")
@@ -261,8 +341,59 @@
   } else if type(declaration) == str {
     parts.push(declaration)
   }
-  for n in nodes {
-    parts.push(_render(n, pretty, pad))
+  for node in nodes {
+    parts.push(_render(node, pretty, pad))
   }
   if pretty { parts.join("\n") + "\n" } else { parts.join() }
+}
+
+// Rebuilds the reader's output without the empty-tag placeholders it produces
+// for comments and processing instructions. Iterative, like `_render`. Each
+// frame holds the element being rebuilt (`none` at the top level), its
+// finished children and its remaining children in reverse order.
+#let _strip-placeholders(nodes) = {
+  let stack = ((node: none, done: (), todo: nodes.rev()),)
+  while true {
+    for _ in range(4096) {
+      if stack.at(-1).todo.len() == 0 {
+        let frame = stack.pop()
+        let finished = if frame.node == none { frame.done } else {
+          frame.node + (children: frame.done)
+        }
+        if stack.len() == 0 { return finished }
+        stack.at(-1).done.push(finished)
+        continue
+      }
+      let child = stack.at(-1).todo.pop()
+      if type(child) == dictionary and child.at("tag", default: none) == "" { continue }
+      if type(child) == dictionary and "children" in child {
+        stack.push((node: child, done: (), todo: child.children.rev()))
+      } else {
+        stack.at(-1).done.push(child)
+      }
+    }
+  }
+}
+
+/// Parses XML into the node structure used by `xml.encode`, using Typst's
+/// built-in reader.
+///
+/// Elements are returned as `(namespace: .., tag: .., attrs: .., children: ..)`,
+/// where `namespace` is the element's namespace URI, which `xml.encode` turns
+/// back into `xmlns` declarations. The reader drops comments, processing
+/// instructions and namespace prefixes.
+///
+/// ```examplec
+/// xml.decode("<p>Hello <b>world</b></p>")
+/// ```
+///
+/// -> array
+#let decode(
+  /// The XML as a string or bytes, or a `path(..)` to a file. Use `path`
+  /// rather than a plain file name, so that the file is found relative to
+  /// your document instead of this package. -> str | bytes | path
+  source,
+) = {
+  let data = if type(source) == str { bytes(source) } else { source }
+  _strip-placeholders(std.xml(data))
 }

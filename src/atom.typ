@@ -1,42 +1,67 @@
-// Atom 1.0 (RFC 4287) feeds.
+// Atom 1.0 feeds (RFC 4287).
 //
-// syndicate is a fork of exemel by Jeremy Gao (https://github.com/wensimehrp/exemel),
-// licensed under Apache-2.0. This file has been modified from the original.
+// Part of syndicate, a fork of exemel by Jeremy Gao.
+// Licensed under the Apache License 2.0; see LICENSE and NOTICE.
 
 #import "util.typ" as _util
 #import "xml.typ" as _xml
 
 #let _ns = "http://www.w3.org/2005/Atom"
+#let _content-type = content
 
-/// Build an RFC 4151 `tag:` URI, a stable identifier for feeds and entries:
-/// `tag-uri("example.com", "2026-01-01", "blog/hello")` → `tag:example.com,2026-01-01:blog/hello`.
+/// Builds a `tag:` URI (RFC 4151): a permanent, unique identifier for a feed
+/// or entry that survives changes to your URLs.
 ///
-/// - `authority`: a domain name or email address you controlled on `date`.
-/// - `date`: a `datetime` or `YYYY-MM-DD` string.
-/// - `specific`: anything that is unique under that authority and date.
-#let tag-uri(authority, date, specific) = {
+/// ```examplec
+/// atom.tag-uri("example.com", "2026-07-01", "blog/hello-world")
+/// ```
+///
+/// -> str
+#let tag-uri(
+  /// A domain name or email address you controlled on `date`. -> str
+  authority,
+  /// A date on which you controlled `authority`, typically when the feed or
+  /// entry was created. -> datetime | str
+  date,
+  /// Anything that is unique for this authority and date. -> str
+  specific,
+) = {
   let authority = _util.to-text(authority, field: "authority").trim()
   if authority == "" { panic("`authority` must not be empty") }
-  let date = _util.to-datetime(date, field: "date")
-  "tag:" + authority + "," + date.display("[year]-[month]-[day]") + ":" + _util.to-text(specific, field: "specific")
+  let date = _util.to-datetime(date, field: "date").display("[year]-[month]-[day]")
+  "tag:" + authority + "," + date + ":" + _util.to-text(specific, field: "specific")
 }
 
-/// A person, for `authors` and `contributors`. A plain string is accepted
-/// wherever a person is expected and is used as the name.
-#let author(name, email: none, uri: none) = _util.record("person", (
+/// Describes a person, for the `authors` and `contributors` of feeds and
+/// entries. Wherever a person is expected, a plain string is accepted as
+/// well and used as the name.
+///
+/// -> dictionary
+#let author(
+  /// The person's name. -> str | content
+  name,
+  /// An email address. -> str | none
+  email: none,
+  /// A web page. -> str | none
+  uri: none,
+) = _util.record("person", (
   name: _util.to-text(name, field: "name"),
   email: _util.opt-text(email, field: "email"),
   uri: _util.opt-text(uri, field: "uri"),
 ))
 
 #let _person(p, field) = {
-  if type(p) == str or type(p) == content { return author(p) }
+  if type(p) in (str, _content-type) { return author(p) }
   if _util.is-record(p, "person") { return p }
   if type(p) == dictionary and "name" in p {
     return author(p.name, email: p.at("email", default: none), uri: p.at("uri", default: none))
   }
-  panic("entries of `" + field + "` must be strings or created with `atom.author`, found " + repr(p))
+  panic(
+    "entries of `" + field + "` must be strings or created with `atom.author`, found " + repr(p),
+  )
 }
+
+#let _people(list, field) = _util.flatten(list).map(p => _person(p, field))
 
 #let _render-person(tag, p) = (
   tag: tag,
@@ -48,82 +73,104 @@
 )
 
 #let _category(c) = {
-  if type(c) == dictionary {
-    if "term" not in c { panic("category dictionaries need a `term`, found " + repr(c)) }
-    (term: _util.to-text(c.term, field: "term"), scheme: _util.opt-text(c.at("scheme", default: none), field: "scheme"), label: _util.opt-text(c.at("label", default: none), field: "label"))
-  } else {
-    (term: _util.to-text(c, field: "category"), scheme: none, label: none)
+  if type(c) != dictionary {
+    return (tag: "category", attrs: (term: _util.to-text(c, field: "category")))
   }
+  if "term" not in c { panic("category dictionaries need a `term`, found " + repr(c)) }
+  (
+    tag: "category",
+    attrs: (
+      term: _util.to-text(c.term, field: "term"),
+      scheme: _util.opt-text(c.at("scheme", default: none), field: "scheme"),
+      label: _util.opt-text(c.at("label", default: none), field: "label"),
+    ),
+  )
 }
 
-#let _render-category(c) = (tag: "category", attrs: c)
-
-#let _content = content
-
-#let _text-construct(tag, value, kind: "text") = {
-  if value == none { return none }
-  (tag: tag, attrs: (type: if kind == "text" { none } else { kind }), children: (_util.to-text(value, field: tag),))
+// A text construct like <title> or <content>; `type="text"` is the default and omitted.
+#let _text(tag, value, kind: "text") = if value != none {
+  (
+    tag: tag,
+    attrs: (type: if kind != "text" { kind }),
+    children: (_util.to-text(value, field: tag),),
+  )
 }
 
-/// An Atom `<entry>`, to be passed to `atom.feed(entries: ..)`.
+/// Describes an entry, for `atom.feed(entries: ..)`.
 ///
-/// - `title`: string or simple content.
-/// - `id`: a permanent, unique IRI; defaults to `link`. See `atom.tag-uri`.
-/// - `link`: URL of the entry's web page.
-/// - `updated`: last significant change; defaults to `published`.
-/// - `published`: first publication.
-/// - `summary`: plain-text summary.
-/// - `content`: the full content. Strings default to `content-type: "html"`
-///   (pass the HTML source; it is escaped as required), Typst content is
-///   converted to plain text and defaults to `"text"`.
-/// - `authors`, `contributors`: arrays of strings or `atom.author(..)`.
-/// - `categories`: strings or `(term: .., scheme: .., label: ..)`.
-/// - `rights`: copyright notice.
-/// - `extra`: additional XML nodes appended to the entry.
+/// ```typc
+/// atom.entry(
+///   "Hello, world",
+///   link: "https://example.com/blog/hello/",
+///   published: "2026-07-01",
+///   summary: [My _first_ post],
+/// )
+/// ```
+///
+/// -> dictionary
 #let entry(
+  /// The title. -> str | content
   title,
+  /// A permanent, unique identifier. Defaults to `link`; consider
+  /// `atom.tag-uri` for identifiers that survive URL changes. -> str | auto
   id: auto,
+  /// The URL of the entry's web page. Required unless `content` is given. -> str | none
   link: none,
+  /// When the entry last changed significantly. Defaults to `published`. -> datetime | str | auto
   updated: auto,
+  /// When the entry was first published. -> datetime | str | none
   published: none,
+  /// A short plain-text summary. -> str | content | none
   summary: none,
+  /// The full content. A string is HTML source, escaped as Atom requires;
+  /// content is converted to plain text. -> str | content | none
   content: none,
+  /// The content's `type`: `"html"`, `"text"` or a MIME type. By default
+  /// `"html"` for strings and `"text"` for content. -> str | auto
   content-type: auto,
+  /// The authors: strings or `atom.author(..)`. -> array
   authors: (),
+  /// The contributors: strings or `atom.author(..)`. -> array
   contributors: (),
+  /// The categories: strings, or dictionaries `(term: .., scheme: .., label: ..)`. -> array
   categories: (),
+  /// A copyright notice. -> str | content | none
   rights: none,
+  /// Additional XML nodes appended to the entry. -> array
   extra: (),
 ) = {
   let title = _util.to-text(title, field: "title")
   let link = _util.opt-text(link, field: "link")
-  let id = if id == auto {
-    if link == none { panic("entry \"" + title + "\" needs an `id` or a `link`") }
-    link
-  } else {
-    _util.to-text(id, field: "id")
+  if id == auto and link == none {
+    panic("entry \"" + title + "\" needs an `id` or a `link`")
   }
   if link == none and content == none {
     panic("entry \"" + title + "\" needs a `link` or `content` (RFC 4287, section 4.1.2)")
   }
   let published = _util.opt-datetime(published, field: "published")
-  let updated = if updated == auto { published } else { _util.opt-datetime(updated, field: "updated") }
+  let updated = if updated == auto { published } else {
+    _util.opt-datetime(updated, field: "updated")
+  }
   if updated == none {
     panic("entry \"" + title + "\" needs `updated` or `published`")
   }
-  let content-type = if content-type != auto { content-type } else if type(content) == _content { "text" } else { "html" }
+  let content-type = if content-type != auto { content-type } else if (
+    type(content) == _content-type
+  ) {
+    "text"
+  } else { "html" }
 
   _util.record("atom.entry", (
     title: title,
-    id: id,
+    id: if id == auto { link } else { _util.to-text(id, field: "id") },
     link: link,
     updated: updated,
     published: published,
     summary: summary,
     content: content,
     content-type: content-type,
-    authors: _util.flatten(authors).map(p => _person(p, "authors")),
-    contributors: _util.flatten(contributors).map(p => _person(p, "contributors")),
+    authors: _people(authors, "authors"),
+    contributors: _people(contributors, "contributors"),
     categories: _util.flatten(categories).map(_category),
     rights: rights,
     extra: extra,
@@ -140,63 +187,86 @@
     if e.published != none { (tag: "published", children: (_util.rfc3339(e.published, tz: tz),)) },
     e.authors.map(p => _render-person("author", p)),
     e.contributors.map(p => _render-person("contributor", p)),
-    e.categories.map(_render-category),
-    _text-construct("summary", e.summary),
-    _text-construct("content", e.content, kind: e.content-type),
-    _text-construct("rights", e.rights),
+    e.categories,
+    _text("summary", e.summary),
+    _text("content", e.content, kind: e.content-type),
+    _text("rights", e.rights),
     e.extra,
   ),
 )
 
-/// An Atom 1.0 feed document, returned as a string.
+/// Generates an Atom 1.0 feed.
 ///
-/// - `title`, `subtitle`: strings or simple content.
-/// - `link`: URL of the website.
-/// - `self-link`: URL where this feed is published (recommended).
-/// - `id`: a permanent, unique IRI; defaults to `link`. See `atom.tag-uri`.
-/// - `updated`: defaults to the latest `updated` of all entries.
-/// - `authors`: required unless every entry has its own authors.
-/// - `contributors`, `categories`, `rights`, `icon`, `logo`: optional metadata.
-/// - `generator`: `none`, a string, or `(name: .., uri: .., version: ..)`.
-/// - `language`: written as `xml:lang`, e.g. `"en"`.
-/// - `entries`: an array of `atom.entry(..)`.
-/// - `tz`: time zone for all dates, e.g. `"Z"` (default) or `"+01:00"`.
-/// - `stylesheet`: URL of an XSL or CSS stylesheet for browsers.
-/// - `namespaces`: extra `(prefix: uri)` declarations for nodes in `extra`.
-/// - `extra`: additional XML nodes appended to the feed.
-/// - `pretty`: indent the output (default `true`).
+/// ```examplec
+/// atom.feed(
+///   title: "My Blog",
+///   link: "https://example.com/",
+///   authors: "Basil",
+///   entries: atom.entry(
+///     "Hello, world",
+///     link: "https://example.com/blog/hello/",
+///     published: "2026-07-01",
+///   ),
+/// )
+/// ```
+///
+/// -> str
 #let feed(
+  /// The feed's title. Required. -> str | content
   title: none,
+  /// A subtitle or description. -> str | content | none
   subtitle: none,
+  /// The URL of the website. Required. -> str
   link: none,
+  /// The URL where this feed is published. Recommended. -> str | none
   self-link: none,
+  /// A permanent, unique identifier. Defaults to `link`. -> str | auto
   id: auto,
+  /// When the feed last changed. Defaults to the latest `updated` of the entries. -> datetime | str | auto
   updated: auto,
+  /// The authors: strings or `atom.author(..)`. Required unless every entry has its own. -> array | str
   authors: (),
+  /// The contributors: strings or `atom.author(..)`. -> array
   contributors: (),
+  /// The categories: strings, or dictionaries `(term: .., scheme: .., label: ..)`. -> array
   categories: (),
+  /// A copyright notice. -> str | content | none
   rights: none,
+  /// The URL of a small icon (square, like a favicon). -> str | none
   icon: none,
+  /// The URL of a larger logo (2:1 aspect ratio). -> str | none
   logo: none,
+  /// The software that generated the feed: a name, or a dictionary
+  /// `(name: .., uri: .., version: ..)`. -> str | dictionary | none
   generator: none,
+  /// The language of the feed, e.g. `"en"`, written as `xml:lang`. -> str | none
   language: none,
+  /// The entries, created with `atom.entry(..)`. -> array
   entries: (),
+  /// The time zone of all dates: `"Z"` for UTC, or an offset like `"+01:00"`. -> str
   tz: "Z",
+  /// The URL of an XSL or CSS stylesheet that browsers apply to the feed. -> str | none
   stylesheet: none,
+  /// Additional namespace declarations `(prefix: uri)`, for elements in `extra`. -> dictionary
   namespaces: (:),
+  /// Additional XML nodes appended to the feed. -> array
   extra: (),
+  /// Whether to indent the output. -> bool
   pretty: true,
 ) = {
   if title == none { panic("`title` is required") }
   if link == none { panic("`link` is required") }
   let link = _util.to-text(link, field: "link")
-  let id = if id == auto { link } else { _util.to-text(id, field: "id") }
-  let entries = _util.flatten(entries).map(e => _util.expect-record(e, "atom.entry", "entries", "atom.entry"))
-  let authors = _util.flatten(authors).map(p => _person(p, "authors"))
+  let entries = _util.flatten(entries).map(e => _util.expect-record(e, "atom.entry", "entries"))
+  let authors = _people(authors, "authors")
   if authors.len() == 0 {
     for e in entries {
       if e.authors.len() == 0 {
-        panic("entry \"" + e.title + "\" has no author; set `authors` on the feed or on every entry (RFC 4287, section 4.1.1)")
+        panic(
+          "entry \""
+            + e.title
+            + "\" has no author; set `authors` on the feed or on every entry (RFC 4287, section 4.1.1)",
+        )
       }
     }
   }
@@ -207,29 +277,40 @@
   } else {
     _util.to-datetime(updated, field: "updated")
   }
-  let generator = if generator == none { none } else if type(generator) == dictionary {
-    (tag: "generator", attrs: (uri: generator.at("uri", default: none), version: generator.at("version", default: none)), children: (_util.to-text(generator.name, field: "generator"),))
-  } else {
+  let generator = if type(generator) == dictionary {
+    (
+      tag: "generator",
+      attrs: (
+        uri: generator.at("uri", default: none),
+        version: generator.at("version", default: none),
+      ),
+      children: (_util.to-text(generator.name, field: "generator"),),
+    )
+  } else if generator != none {
     (tag: "generator", children: (_util.to-text(generator, field: "generator"),))
   }
 
   let root = (
     tag: "feed",
-    attrs: (xmlns: _ns, "xml:lang": _util.opt-text(language, field: "language")) + _util.xmlns-attrs(namespaces),
+    attrs: (xmlns: _ns, "xml:lang": _util.opt-text(language, field: "language"))
+      + _util.xmlns-attrs(namespaces),
     children: (
-      _text-construct("title", title),
-      _text-construct("subtitle", subtitle),
+      _text("title", title),
+      _text("subtitle", subtitle),
       (tag: "link", attrs: (rel: "alternate", type: "text/html", href: link)),
-      if self-link != none { (tag: "link", attrs: (rel: "self", type: "application/atom+xml", href: _util.to-text(self-link, field: "self-link"))) },
-      (tag: "id", children: (id,)),
+      if self-link != none {
+        let href = _util.to-text(self-link, field: "self-link")
+        (tag: "link", attrs: (rel: "self", type: "application/atom+xml", href: href))
+      },
+      (tag: "id", children: (if id == auto { link } else { _util.to-text(id, field: "id") },)),
       (tag: "updated", children: (_util.rfc3339(updated, tz: tz),)),
       authors.map(p => _render-person("author", p)),
-      _util.flatten(contributors).map(p => _render-person("contributor", _person(p, "contributors"))),
-      _util.flatten(categories).map(c => _render-category(_category(c))),
+      _people(contributors, "contributors").map(p => _render-person("contributor", p)),
+      _util.flatten(categories).map(_category),
       generator,
       if icon != none { (tag: "icon", children: (_util.to-text(icon, field: "icon"),)) },
       if logo != none { (tag: "logo", children: (_util.to-text(logo, field: "logo"),)) },
-      _text-construct("rights", rights),
+      _text("rights", rights),
       extra,
       entries.map(e => _render-entry(e, tz)),
     ),

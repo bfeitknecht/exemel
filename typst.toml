@@ -9,4 +9,14 @@ repository = "https://github.com/bfeitknecht/exemel"
 keywords = ["xml", "atom", "rss", "sitemap", "feed", "syndication", "blog"]
 categories = ["integration", "scripting", "utility"]
 compiler = "0.15.0"
-exclude = [".github", "tests", "Justfile", "flake.nix", "flake.lock", ".envrc"]
+exclude = [
+  ".github",
+  "docs",
+  "tests",
+  ".typos.toml",
+  "CONTRIBUTING.md",
+  "Justfile",
+  "flake.nix",
+  "flake.lock",
+  ".envrc",
+]

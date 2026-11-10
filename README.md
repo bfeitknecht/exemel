@@ -68,13 +68,7 @@ Each document function returns the finished XML as a string.
 
 Typst documents can't write arbitrary files by default. There are two ways to get the XML out.
 
-**With `typst eval`:** expose the strings with `metadata` (as above) and extract them on the command line:
-
-```sh
-typst eval --in blog.typ 'query(<feed>).first().value' --format raw -o feed.xml
-```
-
-**With bundle export:** Typst 0.15's experimental bundle target can write the files directly, next to your HTML pages:
+**With bundle export:** Typst 0.15's experimental bundle target writes files directly, next to your HTML pages if you have any:
 
 ```typ
 #asset("feed.xml", feed)
@@ -84,6 +78,12 @@ typst eval --in blog.typ 'query(<feed>).first().value' --format raw -o feed.xml
 
 ```sh
 typst compile --features bundle --format bundle blog.typ site/
+```
+
+**With `typst eval`:** expose the strings with `metadata` (as in the quick start) and extract them on the command line. In Typst 0.15, `eval` prints JSON, so unwrap the string with [`jq`](https://jqlang.org):
+
+```sh
+typst eval --in blog.typ 'query(<feed>).first().value' | jq -j . > feed.xml
 ```
 
 ## Text, dates and time zones
@@ -333,7 +333,7 @@ just update-refs  # regenerate tests/ref/*.xml after intentional output changes
 just package      # assemble dist/syndicate/<version> for typst/packages
 ```
 
-`nix develop` (or direnv) provides `typst` and `just`. CI runs the tests on Typst 0.15.0 and the latest release, and checks that the reference files are up to date.
+`nix develop` (or direnv) provides `typst` and `just`. CI runs the tests on Typst 0.15.0 and the latest release, and checks that the reference files written by bundle export are up to date.
 
 ## License
 

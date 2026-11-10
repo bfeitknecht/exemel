@@ -20,14 +20,10 @@ jobs:
           typst-version: ${{ matrix.typst }}
       - name: Run tests
         run: tests/run.sh
-      - name: Check that reference files are up to date
+      - name: Check that reference files are up to date (via bundle export)
         run: |
           tests/update-refs.sh
           git diff --exit-code tests/ref
-      - name: Check bundle export
+      - name: Check the documented typst eval workflow
         run: |
-          out="$RUNNER_TEMP/site"
-          typst compile --root . --features bundle --format bundle tests/bundle/site.typ "$out"
-          cmp "$out/feed.xml" tests/ref/atom.xml
-          cmp "$out/rss.xml" tests/ref/rss.xml
-          cmp "$out/sitemap.xml" tests/ref/sitemap.xml
+          typst eval --root . --in tests/atom.typ 'query(<out>).first().value' | jq -j . | cmp - tests/ref/atom.xml

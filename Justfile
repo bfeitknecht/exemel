@@ -6,10 +6,7 @@ test:
 
 # Regenerate tests/ref/*.xml from the current implementation; review the diff!
 update-refs:
-    for name in atom rss sitemap; do \
-      typst query --root . --input update=1 tests/$name.typ "<out>" --field value --one \
-        | jq -j . > tests/ref/$name.xml; \
-    done
+    tests/update-refs.sh
 
 # Assemble the package for submission to typst/packages
 package: test

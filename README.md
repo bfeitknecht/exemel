@@ -1,6 +1,6 @@
 # syndicate
 
-Encode Typst values to XML and generate **Atom 1.0** feeds, **RSS 2.0** feeds and **XML sitemaps** for your Typst-built website or blog. Written in pure Typst, with no plugins.
+Encode Typst values to XML and generate **Atom 1.0** feeds, **RSS 2.0** feeds and **XML sitemaps** for your Typst-built website or blog. Written in pure Typst, with no plugins. Requires Typst 0.15 or later.
 
 ```typ
 #import "@preview/syndicate:0.1.0": xml, atom, rss, sitemap
@@ -10,7 +10,7 @@ The package is made of four modules:
 
 | Module    | Functions                                                     |
 | --------- | ------------------------------------------------------------- |
-| `xml`     | `encode`, `element`, `comment`, `cdata`, `pi`, `raw`, `escape` |
+| `xml`     | `encode`, `decode`, `element`, `comment`, `cdata`, `pi`, `raw`, `escape` |
 | `atom`    | `feed`, `entry`, `author`, `tag-uri`                          |
 | `rss`     | `feed`, `item`, `enclosure`                                   |
 | `sitemap` | `urlset`, `url`, `index`                                      |
@@ -18,7 +18,7 @@ The package is made of four modules:
 The date helpers `rfc3339` and `rfc2822` are exported at the top level.
 
 > [!NOTE]
-> Importing `xml` shadows Typst's built-in `xml()` reader in your file. You can still reach the reader as `std.xml`, or import only the modules you need.
+> Typst can read XML on its own, but it can't write it; that's what `xml.encode` is for. Importing `xml` shadows the built-in `xml()` reader in your file. Use `xml.decode`, which wraps the reader, or `std.xml`.
 
 ## Quick start
 
@@ -66,18 +66,24 @@ Each document function returns the finished XML as a string.
 
 ## Writing the files
 
-Typst documents can't write arbitrary files, so expose the strings with `metadata` (as above) and extract them on the command line.
+Typst documents can't write arbitrary files by default. There are two ways to get the XML out.
 
-With Typst 0.15 and later:
+**With `typst eval`:** expose the strings with `metadata` (as above) and extract them on the command line:
 
 ```sh
 typst eval --in blog.typ 'query(<feed>).first().value' --format raw -o feed.xml
 ```
 
-With older versions, use `typst query` and [`jq`](https://jqlang.org):
+**With bundle export:** Typst 0.15's experimental bundle target can write the files directly, next to your HTML pages:
+
+```typ
+#asset("feed.xml", feed)
+#asset("rss.xml", rss-feed)
+#asset("sitemap.xml", map)
+```
 
 ```sh
-typst query blog.typ "<feed>" --field value --one | jq -j . > feed.xml
+typst compile --features bundle --format bundle blog.typ site/
 ```
 
 ## Text, dates and time zones
@@ -125,8 +131,25 @@ Details:
 - **`pretty: true`** only indents elements that contain nothing but other elements. Whitespace is never added around text, so text content is preserved exactly.
 - **`root`** may also be an array: comments and processing instructions around exactly one root element.
 - **`declaration`** is `true` for `<?xml version="1.0" encoding="UTF-8"?>`, `false` for none, or a custom string.
-- **Namespace prefixes** are written into the name, e.g. `(tag: "atom:link")`. An element's `namespace` key holds a namespace URI, which is what Typst 0.15's `xml()` reader produces. That makes `xml.encode(std.xml(bytes(..)))` round trip faithfully.
+- **Namespace prefixes** are written into the name, e.g. `(tag: "atom:link")`. An element's `namespace` key holds a namespace URI (see below).
 - **Invalid input fails with an error:** invalid names, characters XML doesn't allow, `--` in comments, multiple root elements, misspelled keys.
+
+`xml.decode(source)` parses XML into the same structure, using Typst's built-in reader. Pass a string, bytes, or a `path(..)` to a file. Use `path` rather than a plain file name so the file is found relative to your document, not relative to this package:
+
+```typ
+#import "@preview/syndicate:0.1.0": xml
+
+#let catalog = xml.decode(path("catalog.xml")).first()
+#let books = catalog.children.filter(c => type(c) == dictionary and c.tag == "book")
+
+// Modify and write back
+#xml.encode((..catalog, children: books.filter(b => b.attrs.at("id") != "bk102")))
+```
+
+Decoded elements carry a `namespace` key with their namespace URI. `xml.encode` turns it back into `xmlns` declarations, so namespaced documents round trip. The built-in reader has limitations that decoding inherits:
+
+- Comments and processing instructions are dropped. `xml.decode` removes the empty placeholder elements the reader produces for them; plain `std.xml` output still contains them, and `xml.encode` rejects them.
+- Prefixes are lost: `<media:thumbnail>` comes back as `thumbnail` with the media namespace URI, and `xml:lang` comes back as `lang`.
 
 ## Atom
 
@@ -298,6 +321,7 @@ syndicate started as a fork of [exemel](https://github.com/wensimehrp/exemel) an
 | `atom-author(..)`                         | `atom.author(..)`, or just a string                               |
 | `atom-site-id(authority: .., time: .., identifier: ..)` | `atom.tag-uri(authority, date, specific)`           |
 | `tz` on every post                        | `tz` once on the document                                         |
+| Typst 0.13 or later                       | Typst 0.15 or later                                               |
 
 The Rust/WASM plugin is gone, so there is nothing to build.
 
@@ -309,7 +333,7 @@ just update-refs  # regenerate tests/ref/*.xml after intentional output changes
 just package      # assemble dist/syndicate/<version> for typst/packages
 ```
 
-`nix develop` (or direnv) provides `typst`, `just` and `jq`. CI runs the tests on Typst 0.13, 0.14 and the latest release.
+`nix develop` (or direnv) provides `typst` and `just`. CI runs the tests on Typst 0.15.0 and the latest release, and checks that the reference files are up to date.
 
 ## License
 

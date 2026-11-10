@@ -84,15 +84,27 @@
   "<feed xmlns=\"http://www.w3.org/2005/Atom\"><title>t</title><thumb xmlns=\"http://m\"/><plain xmlns=\"\"/></feed>",
 )
 
-// Round trip through Typst's own XML reader
+// Decoding with Typst's reader, and round trips
 #let source = "<feed xmlns=\"http://www.w3.org/2005/Atom\"><title type=\"text\">A &amp; B</title><entry><id>1</id></entry></feed>"
-#let decoded = xml.encode(std.xml(bytes(source)), declaration: false)
-#if sys.version >= version(0, 15, 0) {
-  assert.eq(decoded, source)
-} else {
-  // Older readers drop namespace information.
-  assert.eq(decoded, source.replace(" xmlns=\"http://www.w3.org/2005/Atom\"", ""))
-}
+#assert.eq(xml.encode(xml.decode(source), declaration: false), source)
+#assert.eq(xml.decode(bytes(source)), xml.decode(source))
+
+// Comments and processing instructions are removed (the reader turns them into empty-tag elements)
+#assert.eq(
+  xml.decode("<?xml version=\"1.0\"?><!-- top --><r><!-- c --><a/><?pi x?></r>"),
+  ((namespace: none, tag: "r", attrs: (:), children: ((namespace: none, tag: "a", attrs: (:), children: ()),)),),
+)
+
+// Files are read relative to the calling document via `path`; whitespace is preserved
+#let sample = xml.decode(path("data/sample.xml"))
+#assert.eq(sample.first().tag, "catalog")
+#assert.eq(xml.encode(sample), read("data/sample.xml").trim(at: end))
+
+// Prefixed child namespaces come back as default-namespace declarations
+#assert.eq(
+  xml.encode(xml.decode("<r xmlns=\"urn:a\" xmlns:b=\"urn:b\"><b:x/><y/></r>"), declaration: false),
+  "<r xmlns=\"urn:a\"><x xmlns=\"urn:b\"/><y/></r>",
+)
 
 // Deep trees don't hit the call depth limit (the serializer is iterative)
 #let deep = "x"

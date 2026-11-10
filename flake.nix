@@ -22,7 +22,6 @@
           nativeBuildInputs = [
             pkgs.typst
             pkgs.just
-            pkgs.jq
           ];
         };
       }

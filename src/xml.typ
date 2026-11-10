@@ -64,6 +64,9 @@
     panic("not an XML node: " + repr(node) + " (expected a string or a dictionary)")
   }
   if "tag" in node {
+    if node.tag == "" {
+      panic("element with an empty tag; Typst's `xml()` reader produces these for comments and processing instructions, read files with `xml.decode` instead, which removes them")
+    }
     for k in node.keys() {
       if k not in _element-keys {
         panic("unknown key `" + k + "` in element `" + str(node.tag) + "`; allowed are " + _element-keys.map(k => "`" + k + "`").join(", "))
@@ -187,6 +190,50 @@
     }
   }
   _util.concat(out)
+}
+
+// Typst's `xml()` reader turns comments and processing instructions into
+// elements with an empty tag. Rebuild the tree without them (iteratively, so
+// deep documents don't hit the call depth limit).
+#let _strip-placeholders(nodes) = {
+  let is-placeholder(n) = type(n) == dictionary and n.at("tag", default: none) == ""
+  // Frames: the element being rebuilt (`none` for the top level), its finished
+  // children and its remaining children (reversed, so `pop` yields the next one).
+  let stack = ((node: none, done: (), todo: nodes.rev()),)
+  while true {
+    for _ in range(4096) {
+      if stack.at(-1).todo.len() == 0 {
+        let frame = stack.pop()
+        let finished = if frame.node == none { frame.done } else { frame.node + (children: frame.done) }
+        if stack.len() == 0 { return finished }
+        stack.at(-1).done.push(finished)
+        continue
+      }
+      let child = stack.at(-1).todo.pop()
+      if is-placeholder(child) { continue }
+      if type(child) == dictionary and "children" in child {
+        stack.push((node: child, done: (), todo: child.children.rev()))
+      } else {
+        stack.at(-1).done.push(child)
+      }
+    }
+  }
+}
+
+/// Parse XML into the node structure used by `xml.encode`, using Typst's
+/// built-in `xml()` reader.
+///
+/// - `source`: the XML as a string or bytes, or a `path(..)` to a file. Use
+///   `path` rather than a plain string for files, so that the file is found
+///   relative to your document instead of this package.
+///
+/// Returns an array of top-level nodes. Elements are
+/// `(namespace: .., tag: .., attrs: .., children: ..)`, text is a string.
+/// Comments and processing instructions are dropped, and namespace prefixes
+/// are replaced by the `namespace` URI (a limitation of the reader).
+#let decode(source) = {
+  let data = if type(source) == str { bytes(source) } else { source }
+  _strip-placeholders(std.xml(data))
 }
 
 /// Serialize an XML tree to a string.

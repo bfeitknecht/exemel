@@ -92,7 +92,7 @@
   text(size: 10pt, fill: luma(90))[
     syndicate encodes Typst values to XML and generates Atom 1.0 feeds, RSS 2.0 feeds and
     XML sitemaps for websites and blogs built with Typst. It is written in pure Typst, with
-    no plugins. Licensed under Apache-2.0; a fork of exemel by Jeremy Gao.
+    no plugins. Licensed under the MIT License.
   ]
 })
 
@@ -415,33 +415,6 @@ rss.feed(
   ),
 )
 ```)
-
-= Migrating from exemel
-
-syndicate started as a fork of #link("https://github.com/wensimehrp/exemel")[exemel] and
-redesigns its API:
-
-#table(
-  columns: (1fr, 1fr),
-  stroke: none,
-  inset: (x: 0pt, y: 4pt),
-  column-gutter: 1.5em,
-  table.hline(stroke: 0.5pt),
-  [*exemel*], [*syndicate*],
-  table.hline(stroke: 0.5pt),
-  [`to-xml(value, pretty: ..)`], [`xml.encode(value, pretty: ..)`],
-  [`namespace: "atom"` (a prefix)], [`tag: "atom:link"`; `namespace` holds a URI],
-  [attributes sorted alphabetically], [attributes keep their order],
-  [`atom-encode(site-link: .., posts: ..)`], [`atom.feed(link: .., entries: ..)`],
-  [`feed-link`, guessed as `feed.xml`], [`self-link`, omitted unless given],
-  [`atom-post(..)`], [`atom.entry(..)`; `id` defaults to `link`],
-  [`atom-author(..)`], [`atom.author(..)`, or a string],
-  [`atom-site-id(authority: .., time: .., identifier: ..)`],
-  [`atom.tag-uri(authority, date, specific)`],
-  [`tz` on every post], [`tz` once per document],
-  [Typst 0.13 or later, WASM plugin], [Typst 0.15 or later, pure Typst],
-  table.hline(stroke: 0.5pt),
-)
 
 = Reference
 

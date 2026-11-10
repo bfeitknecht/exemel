@@ -1,7 +1,4 @@
 // RSS 2.0 feeds (https://www.rssboard.org/rss-specification).
-//
-// Part of syndicate, a fork of exemel by Jeremy Gao.
-// Licensed under the Apache License 2.0; see LICENSE and NOTICE.
 
 #import "util.typ" as _util
 #import "xml.typ" as _xml

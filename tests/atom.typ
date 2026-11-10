@@ -1,18 +1,18 @@
 #import "/lib.typ": atom
 #import "posts.typ": *
 
-#let me = atom.author("Hachimi", email: "namerudo@example.com", uri: "https://example.com/ashiga")
+#let me = atom.author("Ada Lovelace", email: "ada@example.com", uri: "https://example.com/about/")
 
 #let out = atom.feed(
-  title: "Honey Drink",
-  subtitle: [Hachimi, _hachimi_, and hachimi],
+  title: "Example Blog",
+  subtitle: [Notes on _typesetting_, feeds and more],
   link: site,
   self-link: site + "feed.xml",
   id: atom.tag-uri("example.com", "2026-01-01", "blog"),
   authors: (me,),
-  contributors: ("Basil",),
+  contributors: ("Grace Hopper",),
   categories: ("blog", (term: "typst", label: "Typst", scheme: "https://typst.app")),
-  rights: "© 2026 Hachimi",
+  rights: "© 2026 Ada Lovelace",
   generator: (name: "syndicate", uri: "https://github.com/bfeitknecht/syndicate", version: "0.1.0"),
   icon: site + "favicon.ico",
   language: "en",

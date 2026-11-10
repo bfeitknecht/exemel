@@ -1,7 +1,4 @@
 // syndicate: encode XML, and generate Atom feeds, RSS feeds and sitemaps.
-//
-// Part of syndicate, a fork of exemel by Jeremy Gao.
-// Licensed under the Apache License 2.0; see LICENSE and NOTICE.
 
 #import "src/xml.typ"
 #import "src/atom.typ"

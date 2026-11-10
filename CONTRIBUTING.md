@@ -45,5 +45,5 @@ documentation changes.
 
 1. Update the version in `typst.toml`, the README, `docs/manual.typ` and `CHANGELOG.md`.
 2. Run `just manual` and commit the PDF.
-3. Run `just package` and copy `dist/syndicate/<version>` into a fork of
-   [typst/packages](https://github.com/typst/packages), under `packages/preview/syndicate/`.
+3. Run `just package` and submit `dist/syndicate/<version>` to
+   [typst/packages](https://github.com/typst/packages) as `packages/preview/syndicate/<version>`.

@@ -1,8 +1,5 @@
 // Internal helpers shared by all modules. Not part of the public API, except
 // for `rfc3339` and `rfc2822`, which `lib.typ` re-exports.
-//
-// Part of syndicate, a fork of exemel by Jeremy Gao.
-// Licensed under the Apache License 2.0; see LICENSE and NOTICE.
 
 // Arrays and strings
 

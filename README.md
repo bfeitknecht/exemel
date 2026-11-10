@@ -153,20 +153,6 @@ order, and `none` attributes and children are omitted.
 `xml.decode` reads XML into the same structure, so documents can be modified and written back.
 Importing `xml` shadows the built-in `xml()` reader; it remains available as `std.xml`.
 
-## Migrating from exemel
-
-syndicate is a fork of [exemel](https://github.com/wensimehrp/exemel) with a redesigned API:
-
-| exemel | syndicate |
-| --- | --- |
-| `to-xml(value, pretty: ..)` | `xml.encode(value, pretty: ..)` |
-| `namespace: "atom"` (a prefix) | `tag: "atom:link"`; `namespace` holds a URI |
-| `atom-encode(site-link: .., feed-link: .., posts: ..)` | `atom.feed(link: .., self-link: .., entries: ..)` |
-| `atom-post(..)`, `atom-author(..)` | `atom.entry(..)`, `atom.author(..)` |
-| `atom-site-id(authority: .., time: .., identifier: ..)` | `atom.tag-uri(authority, date, specific)` |
-| `tz` on every post | `tz` once per document |
-
 ## License
 
-Apache-2.0. syndicate is a fork of [exemel](https://github.com/wensimehrp/exemel) by Jeremy
-Gao; see [NOTICE](NOTICE).
+[MIT](LICENSE). syndicate was inspired by [exemel](https://github.com/wensimehrp/exemel) by Jeremy Gao.

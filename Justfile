@@ -99,14 +99,14 @@ manual:
 package: check
     rm -rf dist
     mkdir -p dist/syndicate/{{ version }}
-    cp -r README.md CHANGELOG.md LICENSE NOTICE typst.toml lib.typ src dist/syndicate/{{ version }}/
-    @echo "Copy dist/syndicate/{{ version }} to packages/preview/syndicate/{{ version }} in your typst/packages fork."
+    cp -r README.md CHANGELOG.md LICENSE typst.toml lib.typ src dist/syndicate/{{ version }}/
+    @echo "Copy dist/syndicate/{{ version }} to packages/preview/syndicate/{{ version }} of a typst/packages clone."
 
 # Install the package locally as @local/syndicate:<version>
 install:
     rm -rf "{{ data_directory() }}/typst/packages/local/syndicate/{{ version }}"
     mkdir -p "{{ data_directory() }}/typst/packages/local/syndicate/{{ version }}"
-    cp -r README.md CHANGELOG.md LICENSE NOTICE typst.toml lib.typ src "{{ data_directory() }}/typst/packages/local/syndicate/{{ version }}/"
+    cp -r README.md CHANGELOG.md LICENSE typst.toml lib.typ src "{{ data_directory() }}/typst/packages/local/syndicate/{{ version }}/"
 
 # Remove the local @local/syndicate:<version> installation
 uninstall:

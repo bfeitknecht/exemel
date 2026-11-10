@@ -2,12 +2,12 @@
 #import "posts.typ": *
 
 #let out = rss.feed(
-  title: "Honey Drink",
+  title: "Example Blog",
   link: site,
-  description: [Hachimi, _hachimi_, and hachimi],
+  description: [Notes on _typesetting_, feeds and more],
   self-link: site + "rss.xml",
   language: "en-us",
-  copyright: "© 2026 Hachimi",
+  copyright: "© 2026 Ada Lovelace",
   categories: ("blog",),
   generator: "syndicate",
   ttl: 60,
@@ -19,7 +19,7 @@
     published: p.published,
     description: p.summary,
     content: p.html,
-    author: atom.author("Hachimi", email: "namerudo@example.com"),
+    author: atom.author("Ada Lovelace", email: "ada@example.com"),
     categories: p.tags,
   )),
 )

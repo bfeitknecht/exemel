@@ -60,12 +60,15 @@ Write all comments and documentation in
 
 Do these steps one time in the settings of the GitHub repository:
 
-1. Make a classic personal access token with the scopes `public_repo` and `workflow`. The user
-   of this token opens the pull requests to typst/packages.
-2. Add the token as the repository secret `PACKAGES_TOKEN`.
-3. Optional: add the repository variable `PACKAGES_FORK` if your fork of typst/packages has a
-   different name. The default is `<repository owner>/packages`. If the fork does not exist,
-   the release workflow makes it.
+1. Make a personal access token with push access to your fork of `typst/packages` and pull request
+   access to `typst/packages`.
+2. Add the token as the repository secret `UNIVERSE_TOKEN`.
+3. Add the repository variable `UNIVERSE_SUBMIT` with the value `true` to submit releases to Typst
+   Universe. If this variable is not `true`, the workflow publishes the GitHub release and skips
+   the pull request to Typst Universe.
+4. Optional: add the repository variable `UNIVERSE_REPO` if your fork of `typst/packages` has a
+   different name. The default is `github.com/<repository owner>/packages`. If the fork does not
+   exist, the release workflow makes it.
 
 ### Procedure
 
@@ -87,8 +90,8 @@ steps:
 
 1. It runs the tests and puts the package files into `dist`.
 2. It makes a GitHub release with the release notes and the manual.
-3. It pushes the package to the branch `syndicate-X.Y.Z` of your fork of typst/packages.
-4. It opens the pull request `syndicate:X.Y.Z` to typst/packages.
+3. If `UNIVERSE_SUBMIT` is `true`, it pushes the package to your fork of `typst/packages`.
+4. It opens the pull request `syndicate:X.Y.Z` to `typst/packages`.
 
 The typst/packages maintainers then examine the pull request. If they ask for changes, make a
 new patch release.

@@ -24,4 +24,4 @@ This is the first release. It needs Typst 0.15 or later.
 - The options `stylesheet`, `namespaces` and `extra` add data to documents.
 - The functions examine their input and give clear errors. They examine XML names, prohibited
   characters, comment syntax, the authors of Atom feeds, the limits of sitemaps and more.
-- The manual contains a guide and a full reference: [docs/manual.pdf](docs/manual.pdf).
+- The manual contains a guide and a full reference: [docs/manual.pdf](https://github.com/bfeitknecht/syndicate/releases/download/v0.1.0/manual.pdf).

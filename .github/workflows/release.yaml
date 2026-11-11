@@ -1,40 +1,62 @@
 # Publishes a release when `just release` pushes a tag `v<version>`.
 #
 # Necessary configuration in the repository settings:
-# - Secret PACKAGES_TOKEN: a classic personal access token with the scopes
-#   `public_repo` and `workflow`. The token user opens the pull request.
-# - Variable PACKAGES_FORK (optional): the fork of typst/packages that gets the
-#   release branch. The default is `<repository owner>/packages`.
+# - Secret UNIVERSE_TOKEN: a personal access token with push access to
+#   UNIVERSE_REPO and pull request access to typst/packages.
+# - Variable UNIVERSE_SUBMIT: set to 'true' to enable the Typst Universe pull
+#   request. When unset, the workflow publishes the GitHub release and skips
+#   the pull request.
+# - Variable UNIVERSE_REPO (optional): the fork of typst/packages that receives
+#   the release branch. The default is `<repository owner>/packages`.
 
-name: Release
+name: Release & submit to Typst Universe
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to submit (for example v0.1.0)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  github-release:
+    name: Publish GitHub release
     runs-on: ubuntu-latest
-    env:
-      PACKAGES_FORK: ${{ vars.PACKAGES_FORK || format('{0}/packages', github.repository_owner) }}
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
       - uses: typst-community/setup-typst@v5
         with:
           typst-version: latest
+
       - uses: taiki-e/install-action@v2
         with:
           tool: just
 
       - name: Read the version
         id: version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' typst.toml)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::The tag $GITHUB_REF_NAME does not agree with version $version in typst.toml."
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::The tag $TAG does not agree with version $version in typst.toml."
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -56,49 +78,112 @@ jobs:
           ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
 
-      - name: Make the GitHub release
+      - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          gh release create "$GITHUB_REF_NAME" docs/manual.pdf \
-            --verify-tag --title "syndicate $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" docs/manual.pdf --clobber
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$TAG" docs/manual.pdf \
+              --verify-tag --title "syndicate $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
 
-      - name: Open a pull request to typst/packages
+  universe-pr:
+    name: Open Typst Universe PR
+    needs: github-release
+    runs-on: ubuntu-latest
+    if: ${{ vars.UNIVERSE_SUBMIT == 'true' }}
+    env:
+      PKG_NAME: syndicate
+      PKG_VER: ${{ needs.github-release.outputs.version }}
+      UPSTREAM_REPO: typst/packages
+      UNIVERSE_REPO: ${{ vars.UNIVERSE_REPO || format('github.com/{0}/packages', github.repository_owner) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
+      - name: Require UNIVERSE_TOKEN
         env:
-          GH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.UNIVERSE_TOKEN }}
         run: |
-          set -euo pipefail
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error::Add the secret PACKAGES_TOKEN to the repository."
+            echo "::error::Missing UNIVERSE_TOKEN secret. Add a token with push access to ${UNIVERSE_REPO} and pull request access to ${UPSTREAM_REPO}."
             exit 1
           fi
-          branch="syndicate-$VERSION"
+
+      - name: Resolve UNIVERSE_REPO
+        run: |
+          set -eu
+          repo="${UNIVERSE_REPO#https://}"
+          repo="${repo#http://}"
+          repo="${repo%/}"
+          repo="${repo%.git}"
+          case "$repo" in
+            */*/*) host="${repo%%/*}"; slug="${repo#*/}" ;;
+            *)     host="github.com";   slug="$repo" ;;
+          esac
+          case "$slug" in
+            */*/*) echo "::error::UNIVERSE_REPO must name one repository, got '$UNIVERSE_REPO'."; exit 1 ;;
+            */*)   ;;
+            *)     echo "::error::UNIVERSE_REPO must be owner/repo, got '$UNIVERSE_REPO'."; exit 1 ;;
+          esac
+          echo "UNIVERSE_HOST=$host" >> "$GITHUB_ENV"
+          echo "UNIVERSE_SLUG=$slug" >> "$GITHUB_ENV"
+
+      - name: Make the package
+        run: just package
+
+      - name: Write the release notes
+        env:
+          VERSION: ${{ env.PKG_VER }}
+        run: |
+          awk -v heading="## $VERSION " '
+            /^## / { if (found) exit }
+            index($0, heading) == 1 { found = 1; next }
+            found
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+
+      - name: Push branch to fork and open pull request
+        env:
+          GH_TOKEN: ${{ secrets.UNIVERSE_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          branch="${PKG_NAME}-${PKG_VER}"
+          fork_owner="${UNIVERSE_SLUG%%/*}"
 
           # Make the fork equal to typst/packages.
-          if ! gh repo view "$PACKAGES_FORK" >/dev/null 2>&1; then
-            gh repo fork typst/packages --clone=false --default-branch-only
+          if ! gh repo view "$UNIVERSE_SLUG" >/dev/null 2>&1; then
+            gh repo fork "$UPSTREAM_REPO" --clone=false --default-branch-only
           fi
-          gh repo sync "$PACKAGES_FORK" --source typst/packages --branch main
+          gh repo sync "$UNIVERSE_SLUG" --source "$UPSTREAM_REPO" --branch main
 
           # Get only the directory of this package from the fork.
           git clone --quiet --depth 1 --filter=blob:none --sparse \
-            "https://x-access-token:$GH_TOKEN@github.com/$PACKAGES_FORK.git" "$RUNNER_TEMP/packages"
+            "https://x-access-token:${GH_TOKEN}@${UNIVERSE_HOST}/${UNIVERSE_SLUG}.git" "$RUNNER_TEMP/packages"
           cd "$RUNNER_TEMP/packages"
-          git sparse-checkout set packages/preview/syndicate
-          if [ -d packages/preview/syndicate ]; then kind=update; else kind=new; fi
+          git sparse-checkout set "packages/preview/${PKG_NAME}"
+          if [ -d "packages/preview/${PKG_NAME}" ]; then kind=update; else kind=new; fi
 
           # Add the package and push the branch.
-          mkdir -p packages/preview/syndicate
-          cp -r "$GITHUB_WORKSPACE/dist/syndicate/$VERSION" packages/preview/syndicate/
+          mkdir -p "packages/preview/${PKG_NAME}"
+          cp -r "$GITHUB_WORKSPACE/dist/${PKG_NAME}/${PKG_VER}" "packages/preview/${PKG_NAME}/"
           login=$(gh api user --jq .login)
           id=$(gh api user --jq .id)
           git config user.name "$login"
           git config user.email "$id+$login@users.noreply.github.com"
           git switch --quiet --create "$branch"
-          git add packages/preview/syndicate
-          git commit --quiet --message "syndicate:$VERSION"
+          git add "packages/preview/${PKG_NAME}"
+          git commit --quiet --message "${PKG_NAME}:${PKG_VER}"
           git push --quiet --force origin "$branch"
 
           # Write the pull request text from the template of typst/packages.
@@ -109,7 +194,7 @@ jobs:
           - [x] a new package
           - [ ] an update for a package
 
-          Description: syndicate encodes Typst values to XML and generates Atom feeds, RSS feeds and sitemaps. Websites and blogs that you make with Typst can use it to publish feeds and sitemaps. It is written in pure Typst. The manual is at $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/manual.pdf.
+          Description: syndicate encodes Typst values to XML and generates Atom feeds, RSS feeds and sitemaps. Websites and blogs that you make with Typst can use it to publish feeds and sitemaps. It is written in pure Typst. The manual is at $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/manual.pdf.
 
           I have read and followed the submission guidelines and, in particular, I
           - [x] selected [a name](https://github.com/typst/packages/blob/main/docs/manifest.md#naming-rules) that isn't the most obvious or canonical name for what the package does
@@ -127,10 +212,10 @@ jobs:
             } > "$body"
           fi
 
-          existing=$(gh pr list --repo typst/packages --head "$branch" --state open --json url --jq '.[0].url // empty')
+          existing=$(gh pr list --repo "$UPSTREAM_REPO" --head "${fork_owner}:${branch}" --state open --json url --jq '.[0].url // empty')
           if [ -n "$existing" ]; then
             echo "The pull request exists: $existing"
           else
-            gh pr create --repo typst/packages --base main --head "${PACKAGES_FORK%%/*}:$branch" \
-              --title "syndicate:$VERSION" --body-file "$body"
+            gh pr create --repo "$UPSTREAM_REPO" --base main --head "${fork_owner}:${branch}" \
+              --title "${PKG_NAME}:${PKG_VER}" --body-file "$body"
           fi

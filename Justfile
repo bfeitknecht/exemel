@@ -116,7 +116,7 @@ uninstall:
 clean:
     rm -rf dist _readme-example.typ
 
-# Release a version. CI then publishes it on GitHub and opens a pull request to typst/packages
+# Release a version. CI then publishes it on GitHub and can open a pull request to Typst Universe
 release new:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -150,4 +150,4 @@ release new:
     git commit --quiet --all --message "Release $new"
     git tag --annotate "v$new" --message "syndicate $new"
     git push --atomic origin main "v$new"
-    echo "Pushed v$new. The release workflow will open the pull request to typst/packages."
+    echo "Pushed v$new. The release workflow publishes the release on GitHub and can open the pull request to Typst Universe."

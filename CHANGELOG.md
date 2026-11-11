@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (2026-11-11)
 
 This is the first release. It needs Typst 0.15 or later.
 

@@ -1,8 +1,11 @@
 # Publishes a release when `just release` pushes a tag `v<version>`.
 #
 # Necessary configuration in the repository settings:
-# - Secret UNIVERSE_TOKEN: a personal access token with push access to
-#   UNIVERSE_REPO and pull request access to typst/packages.
+# - Secret UNIVERSE_TOKEN: a personal access token with push access to UNIVERSE_REPO.
+#   * Classic token (`public_repo` scope): pushes the release branch and opens the PR.
+#   * Fine-grained token (`Contents: read and write` on your packages fork): pushes the
+#     branch. Because fine-grained tokens cannot access external repositories, the
+#     workflow provides a link to open the pull request manually.
 # - Variable UNIVERSE_SUBMIT: set to 'true' to enable the Typst Universe pull
 #   request. When unset, the workflow publishes the GitHub release and skips
 #   the pull request.
@@ -212,10 +215,58 @@ jobs:
             } > "$body"
           fi
 
-          existing=$(gh pr list --repo "$UPSTREAM_REPO" --head "${fork_owner}:${branch}" --state open --json url --jq '.[0].url // empty')
+          existing=$(gh pr list --repo "$UPSTREAM_REPO" --head "${fork_owner}:${branch}" --state open --json url --jq '.[0].url // empty' 2>/dev/null || true)
           if [ -n "$existing" ]; then
             echo "The pull request exists: $existing"
+            {
+              echo "### Typst Universe Pull Request"
+              echo ""
+              echo "A pull request for \`${PKG_NAME}:${PKG_VER}\` already exists: $existing"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            gh pr create --repo "$UPSTREAM_REPO" --base main --head "${fork_owner}:${branch}" \
-              --title "${PKG_NAME}:${PKG_VER}" --body-file "$body"
+            pr_err="$RUNNER_TEMP/pr_err.log"
+            if pr_url=$(gh pr create --repo "$UPSTREAM_REPO" --base main --head "${fork_owner}:${branch}" \
+              --title "${PKG_NAME}:${PKG_VER}" --body-file "$body" 2> "$pr_err"); then
+              echo "Created pull request: $pr_url"
+              {
+                echo "### Typst Universe Pull Request"
+                echo ""
+                echo "Successfully opened pull request: [$pr_url]($pr_url)"
+              } >> "$GITHUB_STEP_SUMMARY"
+            else
+              err_msg=$(cat "$pr_err" 2>/dev/null || echo "")
+              manual_url="https://github.com/${UPSTREAM_REPO}/compare/main...${fork_owner}:${branch}?expand=1"
+              echo "::warning::Automatic PR creation failed (${err_msg})."
+              echo "::warning::This is expected when using a fine-grained PAT (fine-grained tokens cannot create PRs on external repositories)."
+              echo "::warning::The release branch '${branch}' was successfully pushed to ${UNIVERSE_SLUG}."
+              echo "::warning::Open the PR manually at: $manual_url"
+              {
+                echo "### Typst Universe Pull Request"
+                echo ""
+                echo "The release branch \`${branch}\` was pushed to \`${UNIVERSE_SLUG}\`, but automatic PR creation failed:"
+                if [ -n "$err_msg" ]; then
+                  echo ""
+                  echo "> \`$err_msg\`"
+                fi
+                echo ""
+                echo "**Note:** Fine-grained Personal Access Tokens cannot create pull requests on third-party repositories like \`${UPSTREAM_REPO}\`. (To enable automatic PR creation, use a classic PAT with the \`public_repo\` scope)."
+                echo ""
+                echo "#### Open the pull request manually"
+                echo ""
+                echo "👉 **[Click here to open the pull request on ${UPSTREAM_REPO}]($manual_url)**"
+                echo ""
+                echo "<details open><summary><b>Pre-filled Pull Request Content</b></summary>"
+                echo ""
+                echo "**Title:**"
+                echo '```'
+                echo "${PKG_NAME}:${PKG_VER}"
+                echo '```'
+                echo ""
+                echo "**Body:**"
+                echo '```markdown'
+                cat "$body"
+                echo '```'
+                echo "</details>"
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi

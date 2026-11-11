@@ -60,8 +60,9 @@ Write all comments and documentation in
 
 Do these steps one time in the settings of the GitHub repository:
 
-1. Make a personal access token with push access to your fork of `typst/packages` and pull request
-   access to `typst/packages`.
+1. Make a personal access token. You can use one of these two token types:
+   - **Classic token** (scope `public_repo`): This token pushes the branch and opens the pull request automatically.
+   - **Fine-grained token** (access to your fork of `packages` with `Contents: Read and write`): This token pushes the branch. It cannot open the pull request, because GitHub does not permit access to other repositories. The workflow gives a link to open the pull request manually.
 2. Add the token as the repository secret `UNIVERSE_TOKEN`.
 3. Add the repository variable `UNIVERSE_SUBMIT` with the value `true` to submit releases to Typst
    Universe. If this variable is not `true`, the workflow publishes the GitHub release and skips
@@ -91,7 +92,7 @@ steps:
 1. It runs the tests and puts the package files into `dist`.
 2. It makes a GitHub release with the release notes and the manual.
 3. If `UNIVERSE_SUBMIT` is `true`, it pushes the package to your fork of `typst/packages`.
-4. It opens the pull request `syndicate:X.Y.Z` to `typst/packages`.
+4. It opens the pull request `syndicate:X.Y.Z` to `typst/packages`. If the token cannot open the pull request, the workflow gives a link to open it manually.
 
 The typst/packages maintainers then examine the pull request. If they ask for changes, make a
 new patch release.

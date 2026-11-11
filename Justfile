@@ -141,6 +141,7 @@ release new:
     trap 'echo "The release stopped. To discard the changes, run: git checkout ." >&2' ERR
     sed -i.bak "s/^version = \"$old\"/version = \"$new\"/" typst.toml
     sed -i.bak "s|@preview/syndicate:$old|@preview/syndicate:$new|g" README.md docs/manual.typ
+    sed -i.bak "s|releases/download/v$old/manual.pdf|releases/download/v$new/manual.pdf|g" README.md CHANGELOG.md
     sed -i.bak "s/^## Unreleased$/## $new ($(date +%Y-%m-%d))/" CHANGELOG.md
     rm -f typst.toml.bak README.md.bak docs/manual.typ.bak CHANGELOG.md.bak
 
